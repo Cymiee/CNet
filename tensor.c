@@ -173,3 +173,13 @@ Tensor *tensor_mul(Tensor *a, Tensor *b){
         return NULL;
     }
 }
+
+Tensor *tensor_relu(Tensor *a){
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *b = tensor_create(dim, shape, a->requires_grad);
+
+    for(int i = 0; i<size; i++){
+        b->data[i] = a->data[i] > 0 ? a->data[i] : 0;
+    }
+    return b;
+}
