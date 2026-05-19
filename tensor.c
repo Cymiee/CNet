@@ -92,7 +92,7 @@ void tensor_set(Tensor *t, int *indices, float val){
     t->data[offset]=val;
 }
 
-void print_array(float *arr, int len){
+static void print_array(float *arr, int len){
     printf("[");
     for(int i=0; i<len-1; i++){
         printf("%f, ", arr[i]);
@@ -120,6 +120,26 @@ void tensor_print(Tensor *t){
     printf("\n");
 }
 
-Tensor *tensor_add(Tensor *a, Tensor *b){
+static int tensor_shape_equal(Tensor *a, Tensor *b){
+    if(a->ndim != b->ndim)
+        return 0;
+    for(int i = 0; i < a->ndim; i++)
+        if(a->shape[i] != b->shape[i])
+            return 0;
+    return 1;
+}
 
+Tensor *tensor_add(Tensor *a, Tensor *b){
+    if(tensor_shape_equal(a, b)){
+        int dim = a->ndim, *shape = a->shape, size = a->size;
+        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+
+        for(int i = 0; i<size; i++){
+            c->data[i] = a->data[i]+b->data[i];
+        }
+        return c;
+    } else {
+        fprintf(stderr, "tensor shapes not equal, cannot add\n");
+        return NULL;
+    }
 }

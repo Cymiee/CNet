@@ -1,31 +1,61 @@
 #include "tensor.h"
 
 int main(){
+    // --- Test 1: basic addition ---
+    printf("=== Test 1: basic addition ===\n");
     int shape[] = {2, 3};
-    Tensor *t = tensor_create(2, shape, 1);
+    Tensor *a = tensor_create(2, shape, 1);
+    Tensor *b = tensor_create(2, shape, 0);
 
-    // set some values
-    int idx00[] = {0, 0}; tensor_set(t, idx00, 1.0f);
-    int idx01[] = {0, 1}; tensor_set(t, idx01, 2.0f);
-    int idx10[] = {1, 0}; tensor_set(t, idx10, 3.0f);
-    int idx11[] = {1, 2}; tensor_set(t, idx11, 9.0f);
+    // a = [[1, 2, 3], [4, 5, 6]]
+    a->data[0]=1.0f; a->data[1]=2.0f; a->data[2]=3.0f;
+    a->data[3]=4.0f; a->data[4]=5.0f; a->data[5]=6.0f;
 
-    // get them back
-    printf("expect 1.0: %f\n", tensor_get(t, idx00));
-    printf("expect 2.0: %f\n", tensor_get(t, idx01));
-    printf("expect 3.0: %f\n", tensor_get(t, idx10));
-    printf("expect 9.0: %f\n", tensor_get(t, idx11));
+    // b = [[10, 20, 30], [40, 50, 60]]
+    b->data[0]=10.0f; b->data[1]=20.0f; b->data[2]=30.0f;
+    b->data[3]=40.0f; b->data[4]=50.0f; b->data[5]=60.0f;
 
-    tensor_free(t);
-    printf("\n\n");
+    Tensor *c = tensor_add(a, b);
+    printf("expect [[11, 22, 33], [44, 55, 66]]:\n");
+    tensor_print(c);
 
-    int shape3d[] = {2, 3, 4};
+    // c should require grad since a does
+    printf("expect requires_grad=1: %d\n", c->requires_grad);
 
-    Tensor *t3 = tensor_create(3, shape3d, 0);
-    for(int i = 0; i < t3->size; i++)
-        t3->data[i] = (float)i + 1.0f;
-    tensor_print(t3);
-    tensor_free(t3);
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
+
+    // --- Test 2: both require grad ---
+    printf("\n=== Test 2: requires_grad propagation ===\n");
+    Tensor *x = tensor_create(2, shape, 0);
+    Tensor *y = tensor_create(2, shape, 1);
+    Tensor *z = tensor_add(x, y);
+    printf("expect requires_grad=1: %d\n", z->requires_grad);
+    tensor_free(x);
+    tensor_free(y);
+    tensor_free(z);
+
+    // --- Test 3: neither requires grad ---
+    printf("\n=== Test 3: no grad propagation ===\n");
+    Tensor *p = tensor_create(2, shape, 0);
+    Tensor *q = tensor_create(2, shape, 0);
+    Tensor *r = tensor_add(p, q);
+    printf("expect requires_grad=0: %d\n", r->requires_grad);
+    tensor_free(p);
+    tensor_free(q);
+    tensor_free(r);
+
+    // --- Test 4: shape mismatch ---
+    printf("\n=== Test 4: shape mismatch ===\n");
+    int shape2[] = {3, 2};
+    Tensor *m = tensor_create(2, shape, 0);
+    Tensor *n = tensor_create(2, shape2, 0);
+    Tensor *o = tensor_add(m, n);
+    printf("expect NULL: %p\n", (void*)o);
+    tensor_free(m);
+    tensor_free(n);
+    // do NOT free o, it's NULL
 
     return 0;
 }
