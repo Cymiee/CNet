@@ -33,5 +33,7 @@ float tensor_get(Tensor *t, int *indices);
 void tensor_set(Tensor *t, int *indices, float val);
 void tensor_print(Tensor *t);
 Tensor *tensor_add(Tensor *a, Tensor *b);
+Tensor *tensor_sub(Tensor *a, Tensor *b);
+Tensor *tensor_mul(Tensor *a, Tensor *b);
 
 #endif

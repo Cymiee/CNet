@@ -143,3 +143,33 @@ Tensor *tensor_add(Tensor *a, Tensor *b){
         return NULL;
     }
 }
+
+Tensor *tensor_sub(Tensor *a, Tensor *b){
+    if(tensor_shape_equal(a, b)){
+        int dim = a->ndim, *shape = a->shape, size = a->size;
+        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+
+        for(int i = 0; i<size; i++){
+            c->data[i] = a->data[i]-b->data[i];
+        }
+        return c;
+    } else {
+        fprintf(stderr, "tensor shapes not equal, cannot subtract\n");
+        return NULL;
+    }
+}
+
+Tensor *tensor_mul(Tensor *a, Tensor *b){
+    if(tensor_shape_equal(a, b)){
+        int dim = a->ndim, *shape = a->shape, size = a->size;
+        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+
+        for(int i = 0; i<size; i++){
+            c->data[i] = a->data[i]*b->data[i];
+        }
+        return c;
+    } else {
+        fprintf(stderr, "tensor shapes not equal, cannot multiply\n");
+        return NULL;
+    }
+}
