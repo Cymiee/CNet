@@ -1,10 +1,10 @@
+#ifndef TENSOR_H
+#define TENSOR_H
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-#ifndef TENSOR_H
-#define TENSOR_H
 
 typedef struct Tensor Tensor;
 typedef struct BackwardContext BackwardContext;
@@ -37,6 +37,7 @@ Tensor *tensor_add(Tensor *a, Tensor *b);
 Tensor *tensor_sub(Tensor *a, Tensor *b);
 Tensor *tensor_mul(Tensor *a, Tensor *b);
 Tensor *tensor_matmul(Tensor *a, Tensor *b);
+Tensor *tensor_relu(Tensor *a);
 Tensor *tensor_sigmoid(Tensor *a);
 Tensor *tensor_log(Tensor *a);
 Tensor *tensor_sum(Tensor *a);

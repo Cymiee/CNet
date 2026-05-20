@@ -199,7 +199,7 @@ Tensor *tensor_log(Tensor *a){
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
 
     for(int i = 0; i<size; i++){
-        b->data[i] = log(a->data[i]);
+        b->data[i] = logf(a->data[i]);
     }
     return b;
 }
