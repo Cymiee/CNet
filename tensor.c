@@ -1,50 +1,52 @@
 #include "tensor.h"
 
-Tensor *tensor_create(int ndim, int *shape, int requires_grad){
+Tensor *tensor_create(int ndim, int *shape, int requires_grad) {
     Tensor *t = malloc(sizeof(Tensor));
-    if (t==NULL){
+    if (t == NULL) {
         fprintf(stderr, "malloc failed\n");
         return NULL;
     }
-    
+
     int size = 1;
-    for(int i = 0; i<ndim; i++){
+    for (int i = 0; i < ndim; i++)
         size *= shape[i];
-    }
-    t->ndim = ndim;
-    t->size=size;
-    t->requires_grad=requires_grad;
-    t->ctx=NULL;
+
+    t->ndim         = ndim;
+    t->size         = size;
+    t->requires_grad = requires_grad;
+    t->ctx          = NULL;
 
     t->data = calloc(size, sizeof(float));
-    if(t->data==NULL){
+    if (t->data == NULL) {
         fprintf(stderr, "malloc failed\n");
         free(t);
         return NULL;
     }
-    if (requires_grad == 1){
+
+    if (requires_grad) {
         t->grad = calloc(size, sizeof(float));
-        if(t->grad==NULL){
+        if (t->grad == NULL) {
             fprintf(stderr, "malloc failed\n");
             free(t->data);
             free(t);
             return NULL;
         }
-    } else
+    } else {
         t->grad = NULL;
+    }
 
     t->shape = malloc(ndim * sizeof(int));
-    if(t->shape == NULL){
+    if (t->shape == NULL) {
         fprintf(stderr, "malloc failed\n");
         free(t->data);
         free(t->grad);
         free(t);
         return NULL;
     }
-    memcpy(t->shape, shape, ndim*sizeof(int));
+    memcpy(t->shape, shape, ndim * sizeof(int));
 
     t->strides = malloc(ndim * sizeof(int));
-    if(t->strides == NULL){
+    if (t->strides == NULL) {
         fprintf(stderr, "malloc failed\n");
         free(t->data);
         free(t->grad);
@@ -52,15 +54,14 @@ Tensor *tensor_create(int ndim, int *shape, int requires_grad){
         free(t);
         return NULL;
     }
-    t->strides[ndim-1] = 1;
-    for(int i = ndim-2; i>=0; i--){
-        t->strides[i] = t->strides[i+1] * shape[i+1];
-    }
+    t->strides[ndim - 1] = 1;
+    for (int i = ndim - 2; i >= 0; i--)
+        t->strides[i] = t->strides[i + 1] * shape[i + 1];
 
     return t;
 }
 
-void tensor_free(Tensor *t){
+void tensor_free(Tensor *t) {
     free(t->strides);
     free(t->data);
     free(t->grad);
@@ -68,175 +69,155 @@ void tensor_free(Tensor *t){
     free(t);
 }
 
-float tensor_get(Tensor *t, int *indices){
+float tensor_get(Tensor *t, int *indices) {
     int offset = 0;
-    for(int i = 0; i<t->ndim; i++){
-        if(indices[i] < 0 || indices[i]>=t->shape[i]){
-            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n", indices[i], i, t->shape[i]);
+    for (int i = 0; i < t->ndim; i++) {
+        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
+            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n",
+                    indices[i], i, t->shape[i]);
             return -1.0f;
         }
-        offset += indices[i]*t->strides[i];
+        offset += indices[i] * t->strides[i];
     }
     return t->data[offset];
 }
 
-void tensor_set(Tensor *t, int *indices, float val){
+void tensor_set(Tensor *t, int *indices, float val) {
     int offset = 0;
-    for(int i = 0; i<t->ndim; i++){
-        if(indices[i] < 0 || indices[i]>=t->shape[i]){
-            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n", indices[i], i, t->shape[i]);
+    for (int i = 0; i < t->ndim; i++) {
+        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
+            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n",
+                    indices[i], i, t->shape[i]);
             return;
         }
-        offset += indices[i]*t->strides[i];
+        offset += indices[i] * t->strides[i];
     }
-    t->data[offset]=val;
+    t->data[offset] = val;
 }
 
-static void print_array(float *arr, int len){
+static void print_array(float *arr, int len) {
     printf("[");
-    for(int i=0; i<len-1; i++){
+    for (int i = 0; i < len - 1; i++)
         printf("%f, ", arr[i]);
-    }
-    printf("%f]", arr[len-1]);
+    printf("%f]", arr[len - 1]);
 }
 
-static void print_recursive(Tensor *t, int dim, int offset, int depth){
-    if(dim == t->ndim - 1){
+static void print_recursive(Tensor *t, int dim, int offset, int depth) {
+    if (dim == t->ndim - 1) {
         print_array(&t->data[offset], t->shape[dim]);
     } else {
         printf("[");
-        for(int i = 0; i<t->shape[dim]; i++){
-            if(i>0)
-                for(int d=0; d<depth; d++) printf(" ");
-            print_recursive(t, dim + 1, offset + i * t->strides[dim], depth+1);
-            if(i < t->shape[dim]-1) printf(",\n");
+        for (int i = 0; i < t->shape[dim]; i++) {
+            if (i > 0)
+                for (int d = 0; d < depth; d++) printf(" ");
+            print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
+            if (i < t->shape[dim] - 1) printf(",\n");
         }
         printf("]");
     }
 }
 
-void tensor_print(Tensor *t){
+void tensor_print(Tensor *t) {
     print_recursive(t, 0, 0, 0);
     printf("\n");
 }
 
-static int tensor_shape_equal(Tensor *a, Tensor *b){
-    if(a->ndim != b->ndim)
+static int tensor_shape_equal(Tensor *a, Tensor *b) {
+    if (a->ndim != b->ndim)
         return 0;
-    for(int i = 0; i < a->ndim; i++)
-        if(a->shape[i] != b->shape[i])
+    for (int i = 0; i < a->ndim; i++)
+        if (a->shape[i] != b->shape[i])
             return 0;
     return 1;
 }
 
-Tensor *tensor_add(Tensor *a, Tensor *b){
-    if(tensor_shape_equal(a, b)){
-        int dim = a->ndim, *shape = a->shape, size = a->size;
-        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
-
-        for(int i = 0; i<size; i++){
-            c->data[i] = a->data[i]+b->data[i];
-        }
-        return c;
-    } else {
+Tensor *tensor_add(Tensor *a, Tensor *b) {
+    if (!tensor_shape_equal(a, b)) {
         fprintf(stderr, "tensor shapes not equal, cannot add\n");
         return NULL;
     }
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+    for (int i = 0; i < size; i++)
+        c->data[i] = a->data[i] + b->data[i];
+    return c;
 }
 
-Tensor *tensor_sub(Tensor *a, Tensor *b){
-    if(tensor_shape_equal(a, b)){
-        int dim = a->ndim, *shape = a->shape, size = a->size;
-        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
-
-        for(int i = 0; i<size; i++){
-            c->data[i] = a->data[i]-b->data[i];
-        }
-        return c;
-    } else {
+Tensor *tensor_sub(Tensor *a, Tensor *b) {
+    if (!tensor_shape_equal(a, b)) {
         fprintf(stderr, "tensor shapes not equal, cannot subtract\n");
         return NULL;
     }
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+    for (int i = 0; i < size; i++)
+        c->data[i] = a->data[i] - b->data[i];
+    return c;
 }
 
-Tensor *tensor_mul(Tensor *a, Tensor *b){
-    if(tensor_shape_equal(a, b)){
-        int dim = a->ndim, *shape = a->shape, size = a->size;
-        Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
-
-        for(int i = 0; i<size; i++){
-            c->data[i] = a->data[i]*b->data[i];
-        }
-        return c;
-    } else {
+Tensor *tensor_mul(Tensor *a, Tensor *b) {
+    if (!tensor_shape_equal(a, b)) {
         fprintf(stderr, "tensor shapes not equal, cannot multiply\n");
         return NULL;
     }
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
+    for (int i = 0; i < size; i++)
+        c->data[i] = a->data[i] * b->data[i];
+    return c;
 }
 
-Tensor *tensor_relu(Tensor *a){
+Tensor *tensor_relu(Tensor *a) {
     int dim = a->ndim, *shape = a->shape, size = a->size;
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
-
-    for(int i = 0; i<size; i++){
-        b->data[i] = a->data[i] > 0 ? a->data[i] : 0;
-    }
+    for (int i = 0; i < size; i++)
+        b->data[i] = a->data[i] > 0 ? a->data[i] : 0.0f;
     return b;
 }
 
-Tensor *tensor_sigmoid(Tensor *a){
+Tensor *tensor_sigmoid(Tensor *a) {
     int dim = a->ndim, *shape = a->shape, size = a->size;
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
-
-    for(int i = 0; i<size; i++){
+    for (int i = 0; i < size; i++)
         b->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
-    }
     return b;
 }
 
-Tensor *tensor_log(Tensor *a){
+Tensor *tensor_log(Tensor *a) {
     int dim = a->ndim, *shape = a->shape, size = a->size;
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
-
-    for(int i = 0; i<size; i++){
+    for (int i = 0; i < size; i++)
         b->data[i] = logf(a->data[i]);
-    }
     return b;
 }
 
-Tensor *tensor_matmul(Tensor *a, Tensor *b){
-    if (a->ndim != 2 || b->ndim != 2){
+Tensor *tensor_matmul(Tensor *a, Tensor *b) {
+    if (a->ndim != 2 || b->ndim != 2) {
         fprintf(stderr, "matmul failed, both tensors have to be 2-D\n");
         return NULL;
     }
-    if (a->shape[1] != b->shape[0]){
-        fprintf(stderr, "matful failed, tensor a needs to have an equal amount of columns as the rows of tensor b\n");
+    if (a->shape[1] != b->shape[0]) {
+        fprintf(stderr, "matmul failed, tensor a cols must equal tensor b rows\n");
         return NULL;
     }
     int rows = a->shape[0], cols = b->shape[1], sdim = a->shape[1];
     int shape[2] = {rows, cols};
-    Tensor *c = tensor_create(a->ndim, shape, a->requires_grad || b->requires_grad);
-
-    for(int i = 0; i<rows; i++){
-        for(int j = 0; j<cols; j++){
+    Tensor *c = tensor_create(2, shape, a->requires_grad || b->requires_grad);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
             float val = 0.0f;
-            for(int k = 0; k<sdim; k++){
-                val += a->data[i*sdim+k]*b->data[k*cols+j];
-            }
-            c->data[i*cols+j] = val;
+            for (int k = 0; k < sdim; k++)
+                val += a->data[i * sdim + k] * b->data[k * cols + j];
+            c->data[i * cols + j] = val;
         }
     }
-
     return c;
 }
 
-Tensor *tensor_sum(Tensor *a){
+Tensor *tensor_sum(Tensor *a) {
     int shape[1] = {1};
     Tensor *b = tensor_create(1, shape, a->requires_grad);
-
-    for(int i = 0; i<a->size; i++){
+    for (int i = 0; i < a->size; i++)
         b->data[0] += a->data[i];
-    }
-
     return b;
 }
