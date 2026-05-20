@@ -16,8 +16,8 @@ and computation graphs implemented explicitly.
 - **Training** — SGD/Adam in C, MLP/ConvNet in Python
 
 ## Status
-- [x] Tensor engine (in progress)
-- [ ] Autograd
+- [x] Tensor engine
+- [ ] Autograd (in progress)
 - [ ] Python bindings
 - [ ] MNIST training
 
