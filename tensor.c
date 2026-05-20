@@ -189,7 +189,7 @@ Tensor *tensor_sigmoid(Tensor *a){
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
 
     for(int i = 0; i<size; i++){
-        b->data[i] = 1/(1+exp(-a->data[i]));
+        b->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
     }
     return b;
 }
