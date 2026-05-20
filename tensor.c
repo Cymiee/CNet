@@ -183,3 +183,39 @@ Tensor *tensor_relu(Tensor *a){
     }
     return b;
 }
+
+Tensor *tensor_sigmoid(Tensor *a){
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *b = tensor_create(dim, shape, a->requires_grad);
+
+    for(int i = 0; i<size; i++){
+        b->data[i] = 1/(1+exp(-b->data[i]));
+    }
+    return b;
+}
+
+Tensor *tensor_matmul(Tensor *a, Tensor *b){
+    if (a->ndim != 2 || b->ndim != 2){
+        fprintf(stderr, "matmul failed, both tensors have to be 2-D\n");
+        return NULL;
+    }
+    if (a->shape[1] != b->shape[0]){
+        fprintf(stderr, "matful failed, tensor a needs to have an equal amount of columns as the rows of tensor b\n");
+        return NULL;
+    }
+    int rows = a->shape[0], cols = b->shape[1], sdim = a->shape[1];
+    int shape[2] = {rows, cols};
+    Tensor *c = tensor_create(a->ndim, shape, a->requires_grad || b->requires_grad);
+
+    for(int i = 0; i<rows; i++){
+        for(int j = 0; j<cols; j++){
+            float val = 0.0f;
+            for(int k = 0; k<sdim; k++){
+                val += a->data[i*sdim+k]*b->data[k*cols+j];
+            }
+            c->data[i*cols+j] = val;
+        }
+    }
+
+    return c;
+}

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #ifndef TENSOR_H
 #define TENSOR_H
@@ -35,5 +36,7 @@ void tensor_print(Tensor *t);
 Tensor *tensor_add(Tensor *a, Tensor *b);
 Tensor *tensor_sub(Tensor *a, Tensor *b);
 Tensor *tensor_mul(Tensor *a, Tensor *b);
+Tensor *tensor_matmul(Tensor *a, Tensor *b);
+Tensor *tensor_sigmoid(Tensor *a);
 
 #endif
