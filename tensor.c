@@ -189,7 +189,17 @@ Tensor *tensor_sigmoid(Tensor *a){
     Tensor *b = tensor_create(dim, shape, a->requires_grad);
 
     for(int i = 0; i<size; i++){
-        b->data[i] = 1/(1+exp(-b->data[i]));
+        b->data[i] = 1/(1+exp(-a->data[i]));
+    }
+    return b;
+}
+
+Tensor *tensor_log(Tensor *a){
+    int dim = a->ndim, *shape = a->shape, size = a->size;
+    Tensor *b = tensor_create(dim, shape, a->requires_grad);
+
+    for(int i = 0; i<size; i++){
+        b->data[i] = log(a->data[i]);
     }
     return b;
 }
@@ -218,4 +228,15 @@ Tensor *tensor_matmul(Tensor *a, Tensor *b){
     }
 
     return c;
+}
+
+Tensor *tensor_sum(Tensor *a){
+    int shape[1] = {1};
+    Tensor *b = tensor_create(1, shape, a->requires_grad);
+
+    for(int i = 0; i<a->size; i++){
+        b->data[0] += a->data[i];
+    }
+
+    return b;
 }

@@ -38,5 +38,6 @@ Tensor *tensor_sub(Tensor *a, Tensor *b);
 Tensor *tensor_mul(Tensor *a, Tensor *b);
 Tensor *tensor_matmul(Tensor *a, Tensor *b);
 Tensor *tensor_sigmoid(Tensor *a);
+Tensor *tensor_log(Tensor *a);
 
 #endif
