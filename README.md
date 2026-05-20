@@ -22,4 +22,4 @@ and computation graphs implemented explicitly.
 - [ ] MNIST training
 
 ## Build
-gcc -Wall -Wextra -g -o tensor tensor.c main.c
+gcc -Wall -Wextra -g -o tensor tensor.c main.c -lm
