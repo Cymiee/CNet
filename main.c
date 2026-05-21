@@ -2,7 +2,6 @@
 #include "tensor.h"
 
 int main(){
-    // --- Test 1: tensor_add ---
     printf("=== Test 1: tensor_add ===\n");
     int shape[] = {2, 3};
     Tensor *a = tensor_create(2, shape, 1);
@@ -15,9 +14,8 @@ int main(){
     printf("expect [[11, 22, 33], [44, 55, 66]]:\n");
     tensor_print(c);
     printf("expect requires_grad=1: %d\n", c->requires_grad);
-    tensor_free(a); tensor_free(b); tensor_free(c);
+    tensor_free(c); tensor_free(b); tensor_free(a);
 
-    // --- Test 2: tensor_sub ---
     printf("\n=== Test 2: tensor_sub ===\n");
     Tensor *s1 = tensor_create(2, shape, 0);
     Tensor *s2 = tensor_create(2, shape, 0);
@@ -30,7 +28,6 @@ int main(){
     tensor_print(s3);
     tensor_free(s1); tensor_free(s2); tensor_free(s3);
 
-    // --- Test 3: tensor_mul ---
     printf("\n=== Test 3: tensor_mul ===\n");
     Tensor *m1 = tensor_create(2, shape, 0);
     Tensor *m2 = tensor_create(2, shape, 0);
@@ -43,7 +40,6 @@ int main(){
     tensor_print(m3);
     tensor_free(m1); tensor_free(m2); tensor_free(m3);
 
-    // --- Test 4: tensor_relu ---
     printf("\n=== Test 4: tensor_relu ===\n");
     int shape1d[] = {6};
     Tensor *r1 = tensor_create(1, shape1d, 0);
@@ -54,7 +50,6 @@ int main(){
     tensor_print(r2);
     tensor_free(r1); tensor_free(r2);
 
-    // --- Test 5: tensor_sigmoid ---
     printf("\n=== Test 5: tensor_sigmoid ===\n");
     Tensor *sig1 = tensor_create(1, shape1d, 0);
     sig1->data[0]=0.0f;  // sigmoid(0) = 0.5
@@ -68,7 +63,6 @@ int main(){
     tensor_print(sig2);
     tensor_free(sig1); tensor_free(sig2);
 
-    // --- Test 6: tensor_log ---
     printf("\n=== Test 6: tensor_log ===\n");
     int shape_log[] = {4};
     Tensor *l1 = tensor_create(1, shape_log, 0);
@@ -81,7 +75,6 @@ int main(){
     tensor_print(l2);
     tensor_free(l1); tensor_free(l2);
 
-    // --- Test 7: tensor_matmul ---
     printf("\n=== Test 7: tensor_matmul ===\n");
     int sha[] = {2, 2};
     int shb[] = {2, 3};
@@ -96,9 +89,8 @@ int main(){
     Tensor *mc = tensor_matmul(ma, mb);
     printf("expect [[9,12,15],[19,26,33]]:\n");
     tensor_print(mc);
-    tensor_free(ma); tensor_free(mb); tensor_free(mc);
+    tensor_free(mc); tensor_free(mb); tensor_free(ma);
 
-    // --- Test 8: tensor_matmul shape mismatch ---
     printf("\n=== Test 8: tensor_matmul mismatch ===\n");
     int shx[] = {2, 3};
     int shy[] = {2, 2};
@@ -108,7 +100,6 @@ int main(){
     printf("expect NULL: %p\n", (void*)mz);
     tensor_free(mx); tensor_free(my);
 
-    // --- Test 9: tensor_sum ---
     printf("\n=== Test 9: tensor_sum ===\n");
     Tensor *t1 = tensor_create(2, shape, 0);
     t1->data[0]=1.0f; t1->data[1]=2.0f; t1->data[2]=3.0f;
@@ -118,14 +109,28 @@ int main(){
     tensor_print(t2);
     tensor_free(t1); tensor_free(t2);
 
-    // --- Test 10: shape mismatch on elementwise ops ---
     printf("\n=== Test 10: elementwise shape mismatch ===\n");
     int shape3[] = {3, 2};
     Tensor *e1 = tensor_create(2, shape, 0);
     Tensor *e2 = tensor_create(2, shape3, 0);
     Tensor *e3 = tensor_add(e1, e2);
     printf("expect NULL: %p\n", (void*)e3);
-    tensor_free(e1); tensor_free(e2);
+    tensor_free(e3); tensor_free(e2); tensor_free(e1);
+
+    printf("\n=== Test 11: autograd ===\n");
+    int shape1[] = {1};
+    Tensor *x = tensor_create(1, shape1, 1);
+    Tensor *y = tensor_create(1, shape1, 1);
+    x->data[0] = 3.0f;
+    y->data[0] = 4.0f;
+
+    Tensor *z = tensor_mul(x, y);
+    z->grad[0] = 1.0f;
+    tensor_backward(z);
+
+    printf("dz/dx expect 4.0: %f\n", x->grad[0]);
+    printf("dz/dy expect 3.0: %f\n", y->grad[0]);
+    tensor_free(z); tensor_free(y); tensor_free(x);
 
     return 0;
 }
