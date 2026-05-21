@@ -24,7 +24,7 @@ and computation graphs implemented explicitly.
 
 ## Build
 ```bash
-gcc -Wall -Wextra -g -o tensor tensor.c main.c -lm
+gcc -Wall -Wextra -Werror -g -o tensor core/tensor.c core/main.c -lm
 ```
 
 ## Run Tests
