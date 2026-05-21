@@ -41,6 +41,7 @@ Tensor *tensor_relu(Tensor *a);
 Tensor *tensor_sigmoid(Tensor *a);
 Tensor *tensor_log(Tensor *a);
 Tensor *tensor_sum(Tensor *a);
+int grad_check_sum_mul(Tensor *x, Tensor *y, float epsilon, float tolerance);
 void tensor_backward(Tensor *t);
 
 #endif

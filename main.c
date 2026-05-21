@@ -161,10 +161,10 @@ void test_autograd() {
     px->data[2]=3.0f; px->data[3]=4.0f;
     py->data[0]=2.0f; py->data[1]=2.0f;
     py->data[2]=2.0f; py->data[3]=2.0f;
-    Tensor *pxy  = tensor_mul(px, py);
-    Tensor *psum = tensor_sum(pxy);
-    psum->grad[0] = 1.0f;
-    tensor_backward(psum);
+
+    printf("grad check: \n");
+    grad_check_sum_mul(px, py, 1e-4f, 1e-3f);
+
     printf("dz/dx expect [[2,2],[2,2]]:\n");
     Tensor *gx = tensor_create(2, shape2d, 0);
     for (int i = 0; i < 4; i++) gx->data[i] = px->grad[i];
@@ -174,7 +174,6 @@ void test_autograd() {
     for (int i = 0; i < 4; i++) gy->data[i] = py->grad[i];
     tensor_print(gy);
     tensor_free(gx); tensor_free(gy);
-    tensor_free(psum); tensor_free(pxy);
     tensor_free(py); tensor_free(px);
 
     // --- Test 4: z = sum(matmul(A, B)) ---
