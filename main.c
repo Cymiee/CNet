@@ -162,7 +162,7 @@ void test_autograd() {
     py->data[0]=2.0f; py->data[1]=2.0f;
     py->data[2]=2.0f; py->data[3]=2.0f;
 
-    printf("grad check: \n");
+    printf("Grad check: \n");
     grad_check_sum_mul(px, py, 1e-4f, 1e-3f);
 
     printf("dz/dx expect [[2,2],[2,2]]:\n");
@@ -190,10 +190,9 @@ void test_autograd() {
     A->data[2]=3.0f; A->data[3]=4.0f;
     B->data[0]=1.0f; B->data[1]=0.0f;
     B->data[2]=0.0f; B->data[3]=1.0f;
-    Tensor *AB   = tensor_matmul(A, B);
-    Tensor *Ssum = tensor_sum(AB);
-    Ssum->grad[0] = 1.0f;
-    tensor_backward(Ssum);
+
+    printf("Grad check: \n");
+    grad_check_sum_matmul(A, B, 1e-4f, 1e-3f);
     printf("dz/dA expect [[1,1],[1,1]]:\n");
     Tensor *gA = tensor_create(2, shA, 0);
     for (int i = 0; i < 4; i++) gA->data[i] = A->grad[i];
@@ -204,7 +203,6 @@ void test_autograd() {
     for (int i = 0; i < 4; i++) gB->data[i] = B->grad[i];
     tensor_print(gB);
     tensor_free(gA); tensor_free(gB);
-    tensor_free(Ssum); tensor_free(AB);
     tensor_free(B); tensor_free(A);
 }
 

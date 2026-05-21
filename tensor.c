@@ -440,6 +440,51 @@ int grad_check_sum_mul(Tensor *x, Tensor *y, float epsilon, float tolerance) {
     return passed;
 }
 
+float forward_sum_matmul(Tensor *a, Tensor *b) {
+    Tensor *xy = tensor_matmul(a, b);
+    Tensor *s  = tensor_sum(xy);
+    float val  = s->data[0];
+    tensor_free(s);
+    tensor_free(xy);
+    return val;
+}
+
+int grad_check_sum_matmul(Tensor *x, Tensor *y, float epsilon, float tolerance) {
+    Tensor *xy = tensor_matmul(x, y);
+    Tensor *loss = tensor_sum(xy);
+    loss->grad[0] = 1.0f;
+    tensor_backward(loss);
+    tensor_free(loss);
+    tensor_free(xy);
+
+    int passed = 1;
+    for (int i = 0; i < x->size; i++) {
+        float orig = x->data[i];
+
+        x->data[i] = orig + epsilon;
+        float fplus = forward_sum_matmul(x, y);
+
+        x->data[i] = orig - epsilon;
+        float fminus = forward_sum_matmul(x, y);
+
+        x->data[i] = orig;
+
+        float numerical = (fplus - fminus) / (2.0f * epsilon);
+        float analytical = x->grad[i];
+        float diff = fabsf(numerical - analytical);
+        float norm = fabsf(numerical) + fabsf(analytical) + 1e-8f;
+        float error = diff / norm;
+
+        if (error > tolerance) {
+            printf("FAIL at index %d: numerical=%.6f analytical=%.6f error=%.6f\n", 
+                i, numerical, analytical, error);
+            passed = 0;
+        }
+    }
+    if (passed) printf("PASSED: all gradients are within tolerance %.0e\n", tolerance);
+    return passed;
+}
+
 void tensor_backward(Tensor *t) {
     if (t->ctx == NULL) return;
 
