@@ -41,5 +41,6 @@ Tensor *tensor_relu(Tensor *a);
 Tensor *tensor_sigmoid(Tensor *a);
 Tensor *tensor_log(Tensor *a);
 Tensor *tensor_sum(Tensor *a);
+void tensor_backward(Tensor *t);
 
 #endif

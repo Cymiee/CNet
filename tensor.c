@@ -68,30 +68,33 @@ static BackwardContext *backward_context_create(int num_inputs, Tensor *output, 
         return NULL;
     }
     ctx->inputs = malloc(num_inputs * sizeof(Tensor *));
-    if(ctx->inputs == NULL) {
+    if (ctx->inputs == NULL) {
         fprintf(stderr, "malloc failed\n");
         free(ctx);
         return NULL;
     }
-    ctx->num_inputs = num_inputs;
-    ctx->output = output;
-    ctx->extra = NULL;
+    ctx->num_inputs  = num_inputs;
+    ctx->output      = output;
+    ctx->extra       = NULL;
     ctx->backward_fn = backward_fn;
     return ctx;
-}
-
-void tensor_free(Tensor *t) {
-    free(t->strides);
-    free(t->data);
-    free(t->grad);
-    free(t->shape);
-    free(t);
 }
 
 static void backward_context_free(BackwardContext *ctx) {
     free(ctx->inputs);
     if (ctx->extra != NULL) free(ctx->extra);
     free(ctx);
+}
+
+void tensor_free(Tensor *t) {
+    if (t == NULL) return;
+    if (t->ctx != NULL)
+        backward_context_free(t->ctx);
+    free(t->strides);
+    free(t->data);
+    free(t->grad);
+    free(t->shape);
+    free(t);
 }
 
 float tensor_get(Tensor *t, int *indices) {
@@ -157,52 +160,52 @@ static int tensor_shape_equal(Tensor *a, Tensor *b) {
 }
 
 static void add_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
             ctx->inputs[0]->grad[i] += grad_output->grad[i];
-    if(ctx->inputs[1]->requires_grad)
+    if (ctx->inputs[1]->requires_grad)
         for (int i = 0; i < ctx->inputs[1]->size; i++)
             ctx->inputs[1]->grad[i] += grad_output->grad[i];
 }
 
 static void sub_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
             ctx->inputs[0]->grad[i] += grad_output->grad[i];
-    if(ctx->inputs[1]->requires_grad)
+    if (ctx->inputs[1]->requires_grad)
         for (int i = 0; i < ctx->inputs[1]->size; i++)
             ctx->inputs[1]->grad[i] -= grad_output->grad[i];
 }
 
 static void mul_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
             ctx->inputs[0]->grad[i] += grad_output->grad[i] * ctx->inputs[1]->data[i];
-    if(ctx->inputs[1]->requires_grad)
+    if (ctx->inputs[1]->requires_grad)
         for (int i = 0; i < ctx->inputs[1]->size; i++)
             ctx->inputs[1]->grad[i] += grad_output->grad[i] * ctx->inputs[0]->data[i];
 }
 
 static void relu_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
-            ctx->inputs[0]->grad[i] += grad_output->grad[i] * (ctx->inputs[0]->data[i] > 0 ? 1 : 0);
+            ctx->inputs[0]->grad[i] += grad_output->grad[i] * (ctx->inputs[0]->data[i] > 0 ? 1.0f : 0.0f);
 }
 
 static void sigmoid_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
-            ctx->inputs[0]->grad[i] += grad_output->grad[i] * ctx->output->data[i] * (1 - ctx->output->data[i]);
+            ctx->inputs[0]->grad[i] += grad_output->grad[i] * ctx->output->data[i] * (1.0f - ctx->output->data[i]);
 }
 
 static void log_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
             ctx->inputs[0]->grad[i] += grad_output->grad[i] * (1.0f / ctx->inputs[0]->data[i]);
 }
 
 static void sum_backward(BackwardContext *ctx, Tensor *grad_output) {
-    if(ctx->inputs[0]->requires_grad)
+    if (ctx->inputs[0]->requires_grad)
         for (int i = 0; i < ctx->inputs[0]->size; i++)
             ctx->inputs[0]->grad[i] += grad_output->grad[0];
 }
@@ -219,13 +222,19 @@ static void matmul_backward(BackwardContext *ctx, Tensor *grad_output) {
                     ctx->inputs[0]->grad[i * sdim + k] +=
                         grad_output->grad[i * cols + j] *
                         ctx->inputs[1]->data[k * cols + j];
+
     if (ctx->inputs[1]->requires_grad)
         for (int k = 0; k < sdim; k++)
             for (int j = 0; j < cols; j++)
-                for (int i = 0; i < rows; i++)                
+                for (int i = 0; i < rows; i++)
                     ctx->inputs[1]->grad[k * cols + j] +=
                         ctx->inputs[0]->data[i * sdim + k] *
                         grad_output->grad[i * cols + j];
+}
+
+static void ensure_grad(Tensor *t) {
+    if (t->grad == NULL)
+        t->grad = calloc(t->size, sizeof(float));
 }
 
 Tensor *tensor_add(Tensor *a, Tensor *b) {
@@ -237,15 +246,15 @@ Tensor *tensor_add(Tensor *a, Tensor *b) {
     Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
     for (int i = 0; i < size; i++)
         c->data[i] = a->data[i] + b->data[i];
-    
-    if (a->requires_grad || b->requires_grad){
+
+    if (a->requires_grad || b->requires_grad) {
+        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, add_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
         ctx->inputs[1] = b;
         c->ctx = ctx;
     }
-
     return c;
 }
 
@@ -259,14 +268,14 @@ Tensor *tensor_sub(Tensor *a, Tensor *b) {
     for (int i = 0; i < size; i++)
         c->data[i] = a->data[i] - b->data[i];
 
-    if (a->requires_grad || b->requires_grad){
+    if (a->requires_grad || b->requires_grad) {
+        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, sub_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
         ctx->inputs[1] = b;
         c->ctx = ctx;
     }
-
     return c;
 }
 
@@ -279,15 +288,15 @@ Tensor *tensor_mul(Tensor *a, Tensor *b) {
     Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
     for (int i = 0; i < size; i++)
         c->data[i] = a->data[i] * b->data[i];
-    
-    if (a->requires_grad || b->requires_grad){
+
+    if (a->requires_grad || b->requires_grad) {
+        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, mul_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
         ctx->inputs[1] = b;
         c->ctx = ctx;
     }
-
     return c;
 }
 
@@ -297,13 +306,13 @@ Tensor *tensor_relu(Tensor *a) {
     for (int i = 0; i < size; i++)
         b->data[i] = a->data[i] > 0 ? a->data[i] : 0.0f;
 
-    if (a->requires_grad){
+    if (a->requires_grad) {
+        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, relu_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
         b->ctx = ctx;
     }
-
     return b;
 }
 
@@ -313,13 +322,13 @@ Tensor *tensor_sigmoid(Tensor *a) {
     for (int i = 0; i < size; i++)
         b->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
 
-    if (a->requires_grad){
+    if (a->requires_grad) {
+        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, sigmoid_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
         b->ctx = ctx;
     }
-
     return b;
 }
 
@@ -329,13 +338,13 @@ Tensor *tensor_log(Tensor *a) {
     for (int i = 0; i < size; i++)
         b->data[i] = logf(a->data[i]);
 
-    if (a->requires_grad){
+    if (a->requires_grad) {
+        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, log_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
         b->ctx = ctx;
     }
-
     return b;
 }
 
@@ -351,23 +360,22 @@ Tensor *tensor_matmul(Tensor *a, Tensor *b) {
     int rows = a->shape[0], cols = b->shape[1], sdim = a->shape[1];
     int shape[2] = {rows, cols};
     Tensor *c = tensor_create(2, shape, a->requires_grad || b->requires_grad);
-    for (int i = 0; i < rows; i++) {
+    for (int i = 0; i < rows; i++)
         for (int j = 0; j < cols; j++) {
             float val = 0.0f;
             for (int k = 0; k < sdim; k++)
                 val += a->data[i * sdim + k] * b->data[k * cols + j];
             c->data[i * cols + j] = val;
         }
-    }
 
-    if (a->requires_grad || b->requires_grad){
+    if (a->requires_grad || b->requires_grad) {
+        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, matmul_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
         ctx->inputs[1] = b;
         c->ctx = ctx;
     }
-    
     return c;
 }
 
@@ -377,18 +385,18 @@ Tensor *tensor_sum(Tensor *a) {
     for (int i = 0; i < a->size; i++)
         b->data[0] += a->data[i];
 
-    if (a->requires_grad){
+    if (a->requires_grad) {
+        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, sum_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
         b->ctx = ctx;
     }
-
     return b;
 }
 
-void tensor_backward(Tensor *t){
-if (t->ctx == NULL) return;
+void tensor_backward(Tensor *t) {
+    if (t->ctx == NULL) return;
 
     t->ctx->backward_fn(t->ctx, t);
 
