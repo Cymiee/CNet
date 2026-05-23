@@ -4,6 +4,21 @@ import os
 dir = os.path.dirname(os.path.abspath(__file__))
 cnet = ctypes.CDLL(os.path.join(dir, 'libcnet.so'))
 
+class Tensor:
+    def __init__(self, shape, requires_grad=False):
+        self.shape = shape
+        c_shape = create_shape(*shape)
+        self.ptr = cnet.tensor_create(len(shape), c_shape, int(requires_grad))
+
+    def __del__(self):
+        if (self.ptr != None):
+            cnet.tensor_free(self)
+        
+    def print(self):
+        cnet.tensor_print(self)
+
+    
+
 # tensor operations
 cnet.tensor_create.restype  = ctypes.c_void_p
 cnet.tensor_create.argtypes = [
@@ -13,7 +28,7 @@ cnet.tensor_free.restype = None
 cnet.tensor_free.argtypes = [ctypes.c_void_p]
 
 cnet.tensor_get.restype = ctypes.c_float
-cnet.tensor_set.argtypes = [
+cnet.tensor_get.argtypes = [
     ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
 
 cnet.tensor_set.restype = None
