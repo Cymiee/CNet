@@ -97,6 +97,24 @@ void tensor_free(Tensor *t) {
     free(t);
 }
 
+void tensor_set_grad(Tensor *t, int *indices, float val) {
+    int offset = 0;
+    for (int i = 0; i < t->ndim; i++) {
+        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
+            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n",
+                    indices[i], i, t->shape[i]);
+            return;
+        }
+        offset += indices[i] * t->strides[i];
+    }
+    t->grad[offset] = val;
+}
+
+void tensor_set_grad_scalar(Tensor *t, float val) {
+    if (t->grad == NULL) return;
+    t->grad[0] = 1.0f;
+}
+
 float tensor_get(Tensor *t, int *indices) {
     int offset = 0;
     for (int i = 0; i < t->ndim; i++) {
