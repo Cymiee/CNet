@@ -189,10 +189,34 @@ def zeros(shape, requires_grad = False):
     t.ptr = cnet.tensor_create(len(shape), c_shape, requires_grad)
     return t
 
-print("=== Test 5: backward ===")
+print("=== Test 1: create from data ===")
+a = Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+a.print()
+
+print("\n=== Test 2: zeros ===")
+b = zeros((2, 2))
+b.print()
+
+print("\n=== Test 3: operator overloading ===")
+c = a + b
+c.print()
+
+print("\n=== Test 4: matmul ===")
+w = Tensor([[1.0, 0.0], [0.0, 1.0]])
+d = a @ w
+print("expect same as a:")
+d.print()
+
+print("\n=== Test 5: backward ===")
 x = Tensor([[2.0, 3.0]], requires_grad=True)
 y = Tensor([[4.0, 5.0]], requires_grad=True)
-z = sum(mul(x, y))
+print("x requires_grad:", x.ptr is not None)
+xy = mul(x, y)
+print("xy ptr:", xy.ptr)
+z = sum(xy)
+print("z ptr:", z.ptr)
 z.backward()
 print("dz/dx expect [4.0, 5.0]:")
-print([cnet.tensor_get_flat(x.ptr, i) for i in range(2)])
+print(x.get_grad(0, 0), x.get_grad(0, 1))
+print("dz/dy expect [2.0, 3.0]:")
+print(y.get_grad(0, 0), y.get_grad(0, 1))
