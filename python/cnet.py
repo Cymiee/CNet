@@ -101,6 +101,18 @@ class Tensor:
     def __del__(self):
         if (self.ptr is not None):
             cnet.tensor_free(self.ptr)
+
+    def __add__(self, other):
+        return add(self, other)
+    
+    def __sub__(self, other):
+        return sub(self, other)
+    
+    def __mul__(self, other):
+        return mul(self, other)
+    
+    def __matmul__(self, other):
+        return matmul(self, other)
     
     def set(self, indices, val):
         c_indices = to_c_int_arr(*indices)
@@ -109,6 +121,10 @@ class Tensor:
     def get(self, indices):
         c_indices = to_c_int_arr(*indices)
         return cnet.tensor_get(self.ptr, c_indices)
+    
+    def get_grad(self, *indices):
+        c_indices = to_c_int_arr(*indices)
+        return cnet.tensor_get_grad(self.ptr, c_indices)
 
     def print(self):
         cnet.tensor_print(self.ptr)
