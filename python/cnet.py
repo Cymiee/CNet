@@ -24,9 +24,16 @@ cnet.tensor_get.restype = ctypes.c_float
 cnet.tensor_get.argtypes = [
     ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
 
+cnet.tensor_get_flat.restype  = ctypes.c_float
+cnet.tensor_get_flat.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
 cnet.tensor_set.restype = None
 cnet.tensor_set.argtypes = [
     ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_float]
+
+cnet.tensor_set_flat.restype = None
+cnet.tensor_set_flat.argtypes = [
+    ctypes.c_void_p, ctypes.c_int, ctypes.c_float]
 
 cnet.tensor_print.restype = None
 cnet.tensor_print.argtypes = [ctypes.c_void_p]
@@ -64,12 +71,29 @@ def to_c_int_arr(*vals):
     arr = (ctypes.c_int * len(vals))(*vals)
     return arr
 
+def infer_shape(data, shape = ()):
+    if isinstance(data, (int, float)):
+        return shape
+    
+    return infer_shape(data[0], shape + (len(data),))
+
+def flatten(data):
+    for item in data:
+        if isinstance(item, (int, float)):
+            yield item
+        else:
+            yield from flatten(item)
 
 class Tensor:
-    def __init__(self, shape, requires_grad=False):
-        self.shape = shape
-        c_shape = to_c_int_arr(*shape)
-        self.ptr = cnet.tensor_create(len(shape), c_shape, int(requires_grad))
+    def __init__(self, data, requires_grad=False):
+        self.shape = infer_shape(data)
+        flat = list(flatten(data))
+
+        c_shape = to_c_int_arr(*self.shape)
+        self.ptr = cnet.tensor_create(len(self.shape), c_shape, int(requires_grad))
+
+        for i, val in enumerate(flat):
+            cnet.tensor_set_flat(self.ptr, i, val)
 
     def __del__(self):
         if (self.ptr is not None):
@@ -89,6 +113,7 @@ class Tensor:
     def backward(self):
         cnet.tensor_set_grad_scalar(self.ptr, 1.0)
         cnet.tensor_backward(self.ptr)
+
 
 def add(a, b):
     out = Tensor.__new__(Tensor)
@@ -126,11 +151,24 @@ def sigmoid(a):
     out.shape = a.shape
     return out
 
+def relu(a):
+    out = Tensor.__new__(Tensor)
+    out.ptr = cnet.tensor_relu(a.ptr)
+    out.shape = a.shape
+    return out
+
 def sum(a):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_sum(a.ptr)
-    out.shape = a.shape
+    out.shape = (1,)
     return out
+
+def zeros(shape, requires_grad = False):
+    t = Tensor.__new__(Tensor)
+    t.shape = shape
+    c_shape = to_c_int_arr(*shape)
+    t.ptr = cnet.tensor_create(len(shape), c_shape, requires_grad)
+    return t
 
 a = Tensor((2, 2), requires_grad=True)
 b = Tensor((2, 2), requires_grad=True)
