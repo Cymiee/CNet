@@ -115,6 +115,22 @@ void tensor_set_grad_scalar(Tensor *t, float val) {
     t->grad[0] = val;
 }
 
+float tensor_get_grad(Tensor *t, int *indices) {
+    if (t->grad == NULL) {
+        fprintf(stderr, "tensor has no grad\n");
+        return 0.0f;
+    }
+    int offset = 0;
+    for (int i = 0; i < t->ndim; i++) {
+        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
+            fprintf(stderr, "index %d out of bounds for dimension %d\n", indices[i], i);
+            return 0.0f;
+        }
+        offset += indices[i] * t->strides[i];
+    }
+    return t->grad[offset];
+}
+
 float tensor_get(Tensor *t, int *indices) {
     int offset = 0;
     for (int i = 0; i < t->ndim; i++) {

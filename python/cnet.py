@@ -20,6 +20,9 @@ cnet.tensor_set_grad_scalar.restype = None
 cnet.tensor_set_grad_scalar.argtypes = [
     ctypes.c_void_p, ctypes.c_float]
 
+cnet.tensor_get_grad.restype  = ctypes.c_float
+cnet.tensor_get_grad.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+
 cnet.tensor_get.restype = ctypes.c_float
 cnet.tensor_get.argtypes = [
     ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
@@ -170,12 +173,10 @@ def zeros(shape, requires_grad = False):
     t.ptr = cnet.tensor_create(len(shape), c_shape, requires_grad)
     return t
 
-a = Tensor((2, 2), requires_grad=True)
-b = Tensor((2, 2), requires_grad=True)
-a.set([0,0], 1.0); a.set([0,1], 2.0)
-a.set([1,0], 3.0); a.set([1,1], 4.0)
-b.set([0,0], 1.0); b.set([0,1], 1.0)
-b.set([1,0], 1.0); b.set([1,1], 1.0)
-
-c = matmul(a, b)
-c.print()
+print("=== Test 5: backward ===")
+x = Tensor([[2.0, 3.0]], requires_grad=True)
+y = Tensor([[4.0, 5.0]], requires_grad=True)
+z = sum(mul(x, y))
+z.backward()
+print("dz/dx expect [4.0, 5.0]:")
+print([cnet.tensor_get_flat(x.ptr, i) for i in range(2)])
