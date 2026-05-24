@@ -12,10 +12,6 @@ cnet.tensor_create.argtypes = [
 cnet.tensor_free.restype = None
 cnet.tensor_free.argtypes = [ctypes.c_void_p]
 
-cnet.tensor_set_grad.restype = None
-cnet.tensor_set_grad.argtypes = [
-    ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_float]
-
 cnet.tensor_set_grad_scalar.restype = None
 cnet.tensor_set_grad_scalar.argtypes = [
     ctypes.c_void_p, ctypes.c_float]
@@ -138,12 +134,14 @@ def add(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_add(a.ptr, b.ptr)
     out.shape = a.shape
+    out._children = [a, b]
     return out
 
 def sub(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_sub(a.ptr, b.ptr)
     out.shape = a.shape
+    out._children = [a, b]
     return out
     
 def mul(a, b):
@@ -156,30 +154,35 @@ def matmul(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_matmul(a.ptr, b.ptr)
     out.shape = (a.shape[0], b.shape[1])
+    out._children = [a, b]
     return out
 
 def log(a):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_log(a.ptr)
     out.shape = a.shape
+    out._children = [a]
     return out
 
 def sigmoid(a):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_sigmoid(a.ptr)
     out.shape = a.shape
+    out._children = [a]
     return out
 
 def relu(a):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_relu(a.ptr)
     out.shape = a.shape
+    out._children = [a]
     return out
 
 def sum(a):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_sum(a.ptr)
     out.shape = (1,)
+    out._children = [a]
     return out
 
 def zeros(shape, requires_grad = False):
@@ -210,12 +213,10 @@ d.print()
 print("\n=== Test 5: backward ===")
 x = Tensor([[2.0, 3.0]], requires_grad=True)
 y = Tensor([[4.0, 5.0]], requires_grad=True)
-print("x requires_grad:", x.ptr is not None)
-xy = mul(x, y)
-print("xy ptr:", xy.ptr)
-z = sum(xy)
-print("z ptr:", z.ptr)
+
+z = sum(x * y)
 z.backward()
+
 print("dz/dx expect [4.0, 5.0]:")
 print(x.get_grad(0, 0), x.get_grad(0, 1))
 print("dz/dy expect [2.0, 3.0]:")

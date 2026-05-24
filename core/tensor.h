@@ -30,10 +30,10 @@ struct BackwardContext{
 
 Tensor *tensor_create(int ndim, int *shape, int requires_grad);
 void tensor_free(Tensor *t);
-void tensor_set_grad(Tensor *t, int *indices, float val);
 void tensor_set_grad_scalar(Tensor *t, float val);
 float tensor_get_grad(Tensor *t, int *indices);
 float tensor_get(Tensor *t, int *indices);
+float tensor_get_flat(Tensor *t, int index);
 void tensor_set(Tensor *t, int *indices, float val);
 void tensor_set_flat(Tensor *t, int index, float val);
 void tensor_print(Tensor *t);
