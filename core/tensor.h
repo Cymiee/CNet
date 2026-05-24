@@ -34,6 +34,7 @@ void tensor_set_grad(Tensor *t, int *indices, float val);
 void tensor_set_grad_scalar(Tensor *t, float val);
 float tensor_get(Tensor *t, int *indices);
 void tensor_set(Tensor *t, int *indices, float val);
+void tensor_set_flat(Tensor *t, int index, float val);
 void tensor_print(Tensor *t);
 Tensor *tensor_add(Tensor *a, Tensor *b);
 Tensor *tensor_sub(Tensor *a, Tensor *b);
@@ -43,8 +44,6 @@ Tensor *tensor_relu(Tensor *a);
 Tensor *tensor_sigmoid(Tensor *a);
 Tensor *tensor_log(Tensor *a);
 Tensor *tensor_sum(Tensor *a);
-int grad_check_sum_mul(Tensor *x, Tensor *y, float epsilon, float tolerance);
-int grad_check_sum_matmul(Tensor *x, Tensor *y, float epsilon, float tolerance);
 void tensor_backward(Tensor *t);
 
 #endif
