@@ -37,3 +37,9 @@ gcc -shared -fPIC -o python/libcnet.so core/tensor.c -lm
 ./tensor autograd   # gradient check + backward tests
 python3 python/cnet.py  # Python wrapper tests
 ```
+
+## Demo
+```bash
+python3 python/demo.py
+```
+Runs a two-layer MLP forward pass, computes gradients via autograd, and performs one SGD weight update.
