@@ -184,6 +184,26 @@ void tensor_print(Tensor *t) {
     printf("\n");
 }
 
+static void grad_print_recursive(Tensor *t, int dim, int offset, int depth) {
+    if (dim == t->ndim - 1) {
+        print_array(&t->grad[offset], t->shape[dim]);
+    } else {
+        printf("[");
+        for (int i = 0; i < t->shape[dim]; i++) {
+            if (i > 0)
+                for (int d = 0; d < depth; d++) printf(" ");
+            print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
+            if (i < t->shape[dim] - 1) printf(",\n");
+        }
+        printf("]");
+    }
+}
+
+void tensor_print_grad(Tensor *t) {
+    print_recursive(t, 0, 0, 0);
+    printf("\n");
+}
+
 static int tensor_shape_equal(Tensor *a, Tensor *b) {
     if (a->ndim != b->ndim)
         return 0;

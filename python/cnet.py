@@ -37,6 +37,9 @@ cnet.tensor_set_flat.argtypes = [
 cnet.tensor_print.restype = None
 cnet.tensor_print.argtypes = [ctypes.c_void_p]
 
+cnet.tensor_print_grad.restype = None
+cnet.tensor_print_grad.argtypes = [ctypes.c_void_p]
+
 cnet.tensor_backward.restype = None
 cnet.tensor_backward.argtypes = [ctypes.c_void_p]
 

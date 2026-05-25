@@ -37,6 +37,7 @@ float tensor_get_flat(Tensor *t, int index);
 void tensor_set(Tensor *t, int *indices, float val);
 void tensor_set_flat(Tensor *t, int index, float val);
 void tensor_print(Tensor *t);
+void tensor_print_grad(Tensor *t);
 Tensor *tensor_add(Tensor *a, Tensor *b);
 Tensor *tensor_sub(Tensor *a, Tensor *b);
 Tensor *tensor_mul(Tensor *a, Tensor *b);
