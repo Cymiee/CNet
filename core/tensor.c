@@ -97,6 +97,19 @@ void tensor_free(Tensor *t) {
     free(t);
 }
 
+float tensor_get_grad(Tensor *t, int *indices) {
+    int offset = 0;
+    for (int i = 0; i < t->ndim; i++) {
+        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
+            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n",
+                    indices[i], i, t->shape[i]);
+            return 0.0f;
+        }
+        offset += indices[i] * t->strides[i];
+    }
+    return t->grad[offset];
+}
+
 void tensor_set_grad(Tensor *t, int *indices, float val) {
     int offset = 0;
     for (int i = 0; i < t->ndim; i++) {
@@ -192,7 +205,7 @@ static void grad_print_recursive(Tensor *t, int dim, int offset, int depth) {
         for (int i = 0; i < t->shape[dim]; i++) {
             if (i > 0)
                 for (int d = 0; d < depth; d++) printf(" ");
-            print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
+            grad_print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
             if (i < t->shape[dim] - 1) printf(",\n");
         }
         printf("]");
@@ -200,7 +213,7 @@ static void grad_print_recursive(Tensor *t, int dim, int offset, int depth) {
 }
 
 void tensor_print_grad(Tensor *t) {
-    print_recursive(t, 0, 0, 0);
+    grad_print_recursive(t, 0, 0, 0);
     printf("\n");
 }
 

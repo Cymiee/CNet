@@ -12,12 +12,13 @@ cnet.tensor_create.argtypes = [
 cnet.tensor_free.restype = None
 cnet.tensor_free.argtypes = [ctypes.c_void_p]
 
+cnet.tensor_get_grad.restype = ctypes.c_float
+cnet.tensor_get_grad.argtypes = [
+    ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+
 cnet.tensor_set_grad_scalar.restype = None
 cnet.tensor_set_grad_scalar.argtypes = [
     ctypes.c_void_p, ctypes.c_float]
-
-cnet.tensor_get_grad.restype  = ctypes.c_float
-cnet.tensor_get_grad.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
 
 cnet.tensor_get.restype = ctypes.c_float
 cnet.tensor_get.argtypes = [
@@ -120,13 +121,16 @@ class Tensor:
     def get(self, indices):
         c_indices = to_c_int_arr(*indices)
         return cnet.tensor_get(self.ptr, c_indices)
-    
-    def get_grad(self, *indices):
+
+    def get_grad(self, indices):
         c_indices = to_c_int_arr(*indices)
         return cnet.tensor_get_grad(self.ptr, c_indices)
 
     def print(self):
         cnet.tensor_print(self.ptr)
+    
+    def print_grad(self):
+        cnet.tensor_print_grad(self.ptr)
 
     def backward(self):
         cnet.tensor_set_grad_scalar(self.ptr, 1.0)
@@ -195,32 +199,34 @@ def zeros(shape, requires_grad = False):
     t.ptr = cnet.tensor_create(len(shape), c_shape, requires_grad)
     return t
 
-print("=== Test 1: create from data ===")
-a = Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-a.print()
 
-print("\n=== Test 2: zeros ===")
-b = zeros((2, 2))
-b.print()
+if __name__ == "__main__":
+    print("=== Test 1: create from data ===")
+    a = Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    a.print()
 
-print("\n=== Test 3: operator overloading ===")
-c = a + b
-c.print()
+    print("\n=== Test 2: zeros ===")
+    b = zeros((2, 2))
+    b.print()
 
-print("\n=== Test 4: matmul ===")
-w = Tensor([[1.0, 0.0], [0.0, 1.0]])
-d = a @ w
-print("expect same as a:")
-d.print()
+    print("\n=== Test 3: operator overloading ===")
+    c = a + b
+    c.print()
 
-print("\n=== Test 5: backward ===")
-x = Tensor([[2.0, 3.0]], requires_grad=True)
-y = Tensor([[4.0, 5.0]], requires_grad=True)
+    print("\n=== Test 4: matmul ===")
+    w = Tensor([[1.0, 0.0], [0.0, 1.0]])
+    d = a @ w
+    print("expect same as a:")
+    d.print()
 
-z = sum(x * y)
-z.backward()
+    print("\n=== Test 5: backward ===")
+    x = Tensor([[2.0, 3.0]], requires_grad=True)
+    y = Tensor([[4.0, 5.0]], requires_grad=True)
 
-print("dz/dx expect [4.0, 5.0]:")
-print(x.get_grad(0, 0), x.get_grad(0, 1))
-print("dz/dy expect [2.0, 3.0]:")
-print(y.get_grad(0, 0), y.get_grad(0, 1))
+    z = sum(x * y)
+    z.backward()
+
+    print("dz/dx expect [4.0, 5.0]:")
+    x.print_grad()
+    print("dz/dy expect [2.0, 3.0]:")
+    y.print_grad()

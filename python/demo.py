@@ -34,13 +34,28 @@ loss = sum(h2)
 loss.print()
 
 loss.backward()
-print("backward loss results: ")
 
+print("w1 and w2 gradients: ")
+print("w1 grad: ")
+w1.print_grad()
+print("w2 grad: ")
+w2.print_grad()
 
+lr = 0.01
 for i in range(2):
     for j in range(4):
-        print(w1.get_grad(i, j))
+        updated = w1.get((i, j)) - lr * w1.get_grad((i, j))
+        w1.set((i, j), updated)
 
 for i in range(4):
     for j in range(1):
-        print(w2.get_grad(i, j))
+        updated = w2.get((i, j)) - lr * w2.get_grad((i, j))
+        w2.set((i, j), updated)
+
+print("backward loss results: ")
+
+print("updated w1: ")
+w1.print()
+
+print("updated w2: ")
+w2.print()
