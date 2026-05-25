@@ -110,19 +110,6 @@ float tensor_get_grad(Tensor *t, int *indices) {
     return t->grad[offset];
 }
 
-void tensor_set_grad(Tensor *t, int *indices, float val) {
-    int offset = 0;
-    for (int i = 0; i < t->ndim; i++) {
-        if (indices[i] < 0 || indices[i] >= t->shape[i]) {
-            fprintf(stderr, "index %d out of bounds for dimension %d (size %d)\n",
-                    indices[i], i, t->shape[i]);
-            return;
-        }
-        offset += indices[i] * t->strides[i];
-    }
-    t->grad[offset] = val;
-}
-
 void tensor_set_grad_scalar(Tensor *t, float val) {
     if (t->grad == NULL) return;
     t->grad[0] = val;
@@ -172,20 +159,22 @@ void tensor_set_flat(Tensor *t, int index, float val) {
 
 static void print_array(float *arr, int len) {
     printf("[");
-    for (int i = 0; i < len - 1; i++)
-        printf("%f, ", arr[i]);
-    printf("%f]", arr[len - 1]);
+    for (int i = 0; i < len; i++) {
+        if (i > 0) printf(", ");
+        printf("%f", arr[i]);
+    }
+    printf("]");
 }
 
-static void print_recursive(Tensor *t, int dim, int offset, int depth) {
+static void print_recursive(float *arr, Tensor *t, int dim, int offset, int depth) {
     if (dim == t->ndim - 1) {
-        print_array(&t->data[offset], t->shape[dim]);
+        print_array(&arr[offset], t->shape[dim]);
     } else {
         printf("[");
         for (int i = 0; i < t->shape[dim]; i++) {
             if (i > 0)
-                for (int d = 0; d < depth; d++) printf(" ");
-            print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
+                for (int d = 0; d <= depth; d++) printf(" ");
+            print_recursive(arr, t, dim + 1, offset + i * t->strides[dim], depth + 1);
             if (i < t->shape[dim] - 1) printf(",\n");
         }
         printf("]");
@@ -193,27 +182,12 @@ static void print_recursive(Tensor *t, int dim, int offset, int depth) {
 }
 
 void tensor_print(Tensor *t) {
-    print_recursive(t, 0, 0, 0);
+    print_recursive(t->data, t, 0, 0, 0);
     printf("\n");
 }
 
-static void grad_print_recursive(Tensor *t, int dim, int offset, int depth) {
-    if (dim == t->ndim - 1) {
-        print_array(&t->grad[offset], t->shape[dim]);
-    } else {
-        printf("[");
-        for (int i = 0; i < t->shape[dim]; i++) {
-            if (i > 0)
-                for (int d = 0; d < depth; d++) printf(" ");
-            grad_print_recursive(t, dim + 1, offset + i * t->strides[dim], depth + 1);
-            if (i < t->shape[dim] - 1) printf(",\n");
-        }
-        printf("]");
-    }
-}
-
 void tensor_print_grad(Tensor *t) {
-    grad_print_recursive(t, 0, 0, 0);
+    print_recursive(t->grad, t, 0, 0, 0);
     printf("\n");
 }
 
@@ -299,11 +273,6 @@ static void matmul_backward(BackwardContext *ctx, Tensor *grad_output) {
                         grad_output->grad[i * cols + j];
 }
 
-static void ensure_grad(Tensor *t) {
-    if (t->grad == NULL)
-        t->grad = calloc(t->size, sizeof(float));
-}
-
 Tensor *tensor_add(Tensor *a, Tensor *b) {
     if (!tensor_shape_equal(a, b)) {
         fprintf(stderr, "tensor shapes not equal, cannot add\n");
@@ -315,7 +284,6 @@ Tensor *tensor_add(Tensor *a, Tensor *b) {
         c->data[i] = a->data[i] + b->data[i];
 
     if (a->requires_grad || b->requires_grad) {
-        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, add_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
@@ -336,7 +304,6 @@ Tensor *tensor_sub(Tensor *a, Tensor *b) {
         c->data[i] = a->data[i] - b->data[i];
 
     if (a->requires_grad || b->requires_grad) {
-        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, sub_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
@@ -357,7 +324,6 @@ Tensor *tensor_mul(Tensor *a, Tensor *b) {
         c->data[i] = a->data[i] * b->data[i];
 
     if (a->requires_grad || b->requires_grad) {
-        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, mul_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
@@ -374,7 +340,6 @@ Tensor *tensor_relu(Tensor *a) {
         b->data[i] = a->data[i] > 0 ? a->data[i] : 0.0f;
 
     if (a->requires_grad) {
-        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, relu_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
@@ -390,7 +355,6 @@ Tensor *tensor_sigmoid(Tensor *a) {
         b->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
 
     if (a->requires_grad) {
-        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, sigmoid_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
@@ -406,7 +370,6 @@ Tensor *tensor_log(Tensor *a) {
         b->data[i] = logf(a->data[i]);
 
     if (a->requires_grad) {
-        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, log_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;
@@ -436,7 +399,6 @@ Tensor *tensor_matmul(Tensor *a, Tensor *b) {
         }
 
     if (a->requires_grad || b->requires_grad) {
-        ensure_grad(c);
         BackwardContext *ctx = backward_context_create(2, c, matmul_backward);
         if (ctx == NULL) { tensor_free(c); return NULL; }
         ctx->inputs[0] = a;
@@ -453,7 +415,6 @@ Tensor *tensor_sum(Tensor *a) {
         b->data[0] += a->data[i];
 
     if (a->requires_grad) {
-        ensure_grad(b);
         BackwardContext *ctx = backward_context_create(1, b, sum_backward);
         if (ctx == NULL) { tensor_free(b); return NULL; }
         ctx->inputs[0] = a;

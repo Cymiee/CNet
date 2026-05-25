@@ -1,8 +1,8 @@
 import ctypes
 import os
 
-dir = os.path.dirname(os.path.abspath(__file__))
-cnet = ctypes.CDLL(os.path.join(dir, 'libcnet.so'))
+_libdir = os.path.dirname(os.path.abspath(__file__))
+cnet = ctypes.CDLL(os.path.join(_libdir, 'libcnet.so'))
 
 # tensor operations
 cnet.tensor_create.restype  = ctypes.c_void_p
@@ -155,6 +155,7 @@ def mul(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_mul(a.ptr, b.ptr)
     out.shape = a.shape
+    out._children = [a, b]
     return out
 
 def matmul(a, b):

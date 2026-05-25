@@ -15,8 +15,7 @@ for i in range(2):
         w1.set((i, j), random.uniform(-1, 1))
 
 for i in range(4):
-    for j in range(1):
-        w2.set((i, j), random.uniform(-1, 1))
+    w2.set((i, 0), random.uniform(-1, 1))
 
 print("w1: ")
 w1.print()
@@ -48,9 +47,8 @@ for i in range(2):
         w1.set((i, j), updated)
 
 for i in range(4):
-    for j in range(1):
-        updated = w2.get((i, j)) - lr * w2.get_grad((i, j))
-        w2.set((i, j), updated)
+    updated = w2.get((i, 0)) - lr * w2.get_grad((i, 0))
+    w2.set((i, 0), updated)
 
 print("backward loss results: ")
 
