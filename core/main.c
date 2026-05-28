@@ -296,9 +296,7 @@ void test_autograd() {
     tensor_free(B); tensor_free(A);
 }
 
-int main(int argc, char *argv[]) {
-
-    // inside a test function or main:
+void test_mnist() {
     MNISTData *train = mnist_load(
         "data/train-images-idx3-ubyte",
         "data/train-labels-idx1-ubyte"
@@ -310,19 +308,26 @@ int main(int argc, char *argv[]) {
     printf("first pixel: %f\n", train->images[0]);
 
     mnist_free(train);
+}
+
+int main(int argc, char *argv[]) {
 
     if (argc < 2) {
-        printf("Usage: ./tensor [ops|autograd|all]\n");
+        printf("Usage: ./tensor [ops|autograd|mnist|all]\n");
         return 0;
     }
     if (strcmp(argv[1], "ops") == 0) {
         test_ops();
     } else if (strcmp(argv[1], "autograd") == 0) {
         test_autograd();
+    } else if (strcmp(argv[1], "mnist") == 0) {
+        test_mnist();
     } else if (strcmp(argv[1], "all") == 0) {
         test_ops();
         printf("\n");
         test_autograd();
+        printf("\n");
+        test_mnist();
     } else {
         printf("Unknown command: %s\n", argv[1]);
         printf("Usage: ./tensor [ops|autograd|all]\n");
