@@ -297,6 +297,8 @@ void test_autograd() {
 }
 
 void test_mnist() {
+    printf("=== MNIST Test: Loading ===\n");
+
     MNISTData *train = mnist_load(
         "data/train-images-idx3-ubyte",
         "data/train-labels-idx1-ubyte"

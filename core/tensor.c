@@ -157,6 +157,12 @@ void tensor_set_flat(Tensor *t, int index, float val) {
     t->data[index] = val;
 }
 
+void tensor_zero_grad(Tensor *t) {
+    if (t->grad == NULL) return;
+    for (int i = 0; i < t->size; i++)
+        t->grad[i] = 0.0f;
+}
+
 static void print_array(float *arr, int len) {
     printf("[");
     for (int i = 0; i < len; i++) {
