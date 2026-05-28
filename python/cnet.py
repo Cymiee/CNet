@@ -35,6 +35,9 @@ cnet.tensor_set_flat.restype = None
 cnet.tensor_set_flat.argtypes = [
     ctypes.c_void_p, ctypes.c_int, ctypes.c_float]
 
+cnet.tensor_zero_grad.restype = None
+cnet.tensor_zero_grad.argtypes = [ctypes.c_void_p]
+
 cnet.tensor_print.restype = None
 cnet.tensor_print.argtypes = [ctypes.c_void_p]
 
@@ -126,6 +129,9 @@ class Tensor:
         c_indices = to_c_int_arr(*indices)
         return cnet.tensor_get_grad(self.ptr, c_indices)
 
+    def zero_grad(self):
+        return cnet.tensor_zero_grad(self)
+    
     def print(self):
         cnet.tensor_print(self.ptr)
     
