@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "tensor.h"
+#include "mnist.h"
 
 float forward_sum_mul(Tensor *a, Tensor *b) {
     Tensor *xy = tensor_mul(a, b);
@@ -296,6 +297,20 @@ void test_autograd() {
 }
 
 int main(int argc, char *argv[]) {
+
+    // inside a test function or main:
+    MNISTData *train = mnist_load(
+        "data/train-images-idx3-ubyte",
+        "data/train-labels-idx1-ubyte"
+    );
+
+    printf("count: %d\n", train->count);
+    printf("rows: %d, cols: %d\n", train->rows, train->cols);
+    printf("first label: %d\n", train->labels[0]);
+    printf("first pixel: %f\n", train->images[0]);
+
+    mnist_free(train);
+
     if (argc < 2) {
         printf("Usage: ./tensor [ops|autograd|all]\n");
         return 0;
