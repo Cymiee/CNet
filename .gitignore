@@ -3,3 +3,4 @@ tensor
 *.dSYM
 ten
 .vscode
+data
