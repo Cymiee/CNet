@@ -115,6 +115,14 @@ void tensor_set_grad_scalar(Tensor *t, float val) {
     t->grad[0] = val;
 }
 
+void tensor_set_grad_flat(Tensor *t, int index, float val) {
+    if (index < 0 || index >= t->size) {
+        fprintf(stderr, "flat index %d out of bounds\n", index);
+        return;
+    }
+    t->grad[index] = val;
+}
+
 float tensor_get(Tensor *t, int *indices) {
     int offset = 0;
     for (int i = 0; i < t->ndim; i++) {

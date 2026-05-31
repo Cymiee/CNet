@@ -1,5 +1,6 @@
 import ctypes
 import os
+import math
 
 _libdir = os.path.dirname(os.path.abspath(__file__))
 cnet = ctypes.CDLL(os.path.join(_libdir, 'libcnet.so'))
@@ -19,6 +20,10 @@ cnet.tensor_get_grad.argtypes = [
 cnet.tensor_set_grad_scalar.restype = None
 cnet.tensor_set_grad_scalar.argtypes = [
     ctypes.c_void_p, ctypes.c_float]
+
+cnet.tensor_set_grad_flat.restype = None
+cnet.tensor_set_grad_flat.argtypes = [
+    ctypes.c_void_p, ctypes.c_int, ctypes.c_float]
 
 cnet.tensor_get.restype = ctypes.c_float
 cnet.tensor_get.argtypes = [
@@ -129,6 +134,9 @@ class Tensor:
         c_indices = to_c_int_arr(*indices)
         return cnet.tensor_get_grad(self.ptr, c_indices)
 
+    def set_grad_flat(self, index, val):
+        cnet.tensor_set_grad_flat(self.ptr, index, val)
+
     def zero_grad(self):
         return cnet.tensor_zero_grad(self)
     
@@ -206,6 +214,25 @@ def zeros(shape, requires_grad = False):
     t.ptr = cnet.tensor_create(len(shape), c_shape, requires_grad)
     return t
 
+def softmax(logits):
+    n = logits.shape[0] * logits.shape[1]
+    values = [cnet.tensor_get_flat(logits.ptr, i) for i in range(n)]
+    max_val = max(values)
+    exps = [math.exp(v - max_val) for v in values]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+def cross_entropy_loss(logits, labels):
+    probs = softmax(logits)
+    loss = -math.log(probs[labels] + 1e-8)
+
+    grads = list(probs)
+    grads[labels] -= 1.0
+
+    for i, g in enumerate(grads):
+        cnet.tensor_set_grad_flat(logits.ptr, i, g)
+
+    return loss
 
 if __name__ == "__main__":
     print("=== Test 1: create from data ===")
