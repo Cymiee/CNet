@@ -91,6 +91,21 @@ python3 python/demo.py t10k-images-idx3-ubyte t10k-labels-idx1-ubyte --load weig
 
 ---
 
+## Live Drawing App
+
+Draw a digit with your mouse/trackpad and see predictions update in real time:
+
+```bash
+python3 python/draw.py weights.bin
+```
+
+Requires Pillow and tkinter (tkinter ships with Python on macOS):
+```bash
+pip install Pillow
+```
+
+---
+
 ## Predict from Image
 
 Requires [Pillow](https://pillow.readthedocs.io):
