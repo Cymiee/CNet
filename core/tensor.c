@@ -451,3 +451,16 @@ void tensor_backward(Tensor *t) {
         if (t->ctx->inputs[i]->requires_grad)
             tensor_backward(t->ctx->inputs[i]);
 }
+
+void tensor_copy_data_to_buffer(Tensor *t, float *buf) {
+    memcpy(buf, t->data, t->size * sizeof(float));
+}
+
+float tensor_get_grad_flat(Tensor *t, int index) {
+    return t->grad[index];
+}
+
+void tensor_sgd_step(Tensor *t, float lr) {
+    for (int i = 0; i < t->size; i++)
+        t->data[i] -= lr * t->grad[i];
+}

@@ -50,5 +50,8 @@ Tensor *tensor_log(Tensor *a);
 Tensor *tensor_sum(Tensor *a);
 void tensor_backward_step(Tensor *t);
 void tensor_backward(Tensor *t);
+void tensor_copy_data_to_buffer(Tensor *t, float *buf);
+float tensor_get_grad_flat(Tensor *t, int index);
+void tensor_sgd_step(Tensor *t, float lr);
 
 #endif

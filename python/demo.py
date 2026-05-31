@@ -2,58 +2,56 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import random
-from cnet import Tensor, add, sub, mul, matmul, log, sigmoid, relu, sum, zeros
+from cnet import MNISTData, matmul, relu, randn, cross_entropy_loss
 
-inp = Tensor([[4.0, 1.0]])
+LR      = 0.01
+EPOCHS  = 3
+H       = 128
+IN_DIM  = 784
+CLASSES = 10
 
-w1 = zeros((2, 4), requires_grad=True)
-w2 = zeros((4, 1), requires_grad=True)
+def main(img_path, lbl_path):
+    data = MNISTData(img_path, lbl_path)
+    print(f"Loaded {data.count} samples ({data.rows}x{data.cols})")
 
-for i in range(2):
-    for j in range(4):
-        w1.set((i, j), random.uniform(-1, 1))
+    # He init: scale = sqrt(2 / fan_in)
+    w1 = randn((IN_DIM, H),      requires_grad=True, scale=(2.0 / IN_DIM) ** 0.5)
+    w2 = randn((H,      CLASSES), requires_grad=True, scale=(2.0 / H)      ** 0.5)
 
-for i in range(4):
-    w2.set((i, 0), random.uniform(-1, 1))
+    for epoch in range(EPOCHS):
+        total_loss = 0.0
+        correct    = 0
 
-print("w1: ")
-w1.print()
-print("h1 = input matmul w1: ")
-h1 = matmul(inp, w1)
-h1.print()
-print("relu of h1: ")
-h1_relu = relu(h1)
-h1_relu.print()
-print("h2 = h1_relu matmul w2")
-h2 = matmul(h1_relu, w2)
-h2.print()
-print("loss: ")
-loss = sum(h2)
-loss.print()
+        for idx in range(data.count):
+            img   = data.get_image_tensor(idx)   # (1, 784)
+            label = data.get_label(idx)
 
-loss.backward()
+            h      = relu(matmul(img, w1))        # (1, H)
+            logits = matmul(h, w2)                # (1, CLASSES)
 
-print("w1 and w2 gradients: ")
-print("w1 grad: ")
-w1.print_grad()
-print("w2 grad: ")
-w2.print_grad()
+            # Sets logits.grad to softmax gradient, returns scalar loss
+            loss = cross_entropy_loss(logits, label)
+            total_loss += loss
+            correct    += int(logits.argmax() == label)
 
-lr = 0.01
-for i in range(2):
-    for j in range(4):
-        updated = w1.get((i, j)) - lr * w1.get_grad((i, j))
-        w1.set((i, j), updated)
+            # Propagate from logits (grad already set by cross_entropy_loss)
+            logits.backward_grad_set()
 
-for i in range(4):
-    updated = w2.get((i, 0)) - lr * w2.get_grad((i, 0))
-    w2.set((i, 0), updated)
+            w1.sgd_step(LR)
+            w2.sgd_step(LR)
+            w1.zero_grad()
+            w2.zero_grad()
 
-print("backward loss results: ")
+            if (idx + 1) % 5000 == 0:
+                print(f"  epoch {epoch+1} [{idx+1:>5}/{data.count}]  "
+                      f"loss={total_loss/(idx+1):.4f}  "
+                      f"acc={correct/(idx+1):.3f}")
 
-print("updated w1: ")
-w1.print()
+        print(f"Epoch {epoch+1}: loss={total_loss/data.count:.4f}  "
+              f"acc={correct/data.count:.3f}")
 
-print("updated w2: ")
-w2.print()
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python demo.py <images-file> <labels-file>")
+        sys.exit(1)
+    main(sys.argv[1], sys.argv[2])

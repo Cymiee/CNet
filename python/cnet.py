@@ -1,7 +1,8 @@
 import builtins
 import ctypes
-import os
 import math
+import os
+import random
 
 _libdir = os.path.dirname(os.path.abspath(__file__))
 cnet = ctypes.CDLL(os.path.join(_libdir, 'libcnet.so'))
@@ -81,6 +82,32 @@ cnet.tensor_matmul.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 cnet.tensor_sum.restype = ctypes.c_void_p
 cnet.tensor_sum.argtypes = [ctypes.c_void_p]
 
+cnet.tensor_copy_data_to_buffer.restype = None
+cnet.tensor_copy_data_to_buffer.argtypes = [
+    ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
+
+cnet.tensor_get_grad_flat.restype  = ctypes.c_float
+cnet.tensor_get_grad_flat.argtypes = [ctypes.c_void_p, ctypes.c_int]
+
+cnet.tensor_sgd_step.restype  = None
+cnet.tensor_sgd_step.argtypes = [ctypes.c_void_p, ctypes.c_float]
+
+# MNIST
+class MNISTDataC(ctypes.Structure):
+    _fields_ = [
+        ("images", ctypes.POINTER(ctypes.c_float)),
+        ("labels", ctypes.POINTER(ctypes.c_int)),
+        ("count",  ctypes.c_int),
+        ("rows",   ctypes.c_int),
+        ("cols",   ctypes.c_int),
+    ]
+
+cnet.mnist_load.restype  = ctypes.POINTER(MNISTDataC)
+cnet.mnist_load.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+
+cnet.mnist_free.restype  = None
+cnet.mnist_free.argtypes = [ctypes.POINTER(MNISTDataC)]
+
 
 def to_c_int_arr(*vals):
     arr = (ctypes.c_int * len(vals))(*vals)
@@ -142,13 +169,36 @@ class Tensor:
         cnet.tensor_set_grad_flat(self.ptr, index, val)
 
     def zero_grad(self):
-        return cnet.tensor_zero_grad(self)
+        cnet.tensor_zero_grad(self.ptr)
     
     def print(self):
         cnet.tensor_print(self.ptr)
     
     def print_grad(self):
         cnet.tensor_print_grad(self.ptr)
+
+    def sgd_step(self, lr):
+        cnet.tensor_sgd_step(self.ptr, lr)
+
+    def argmax(self):
+        n = math.prod(self.shape)
+        buf = (ctypes.c_float * n)()
+        cnet.tensor_copy_data_to_buffer(self.ptr, buf)
+        return max(range(n), key=lambda i: buf[i])
+
+    def backward_grad_set(self):
+        """Backward pass using self.grad as-is (don't reset to 1.0)."""
+        def build_topo(t, visited, order):
+            if id(t) in visited:
+                return
+            visited.add(id(t))
+            for child in getattr(t, '_children', []):
+                build_topo(child, visited, order)
+            order.append(t)
+        visited, order = set(), []
+        build_topo(self, visited, order)
+        for t in reversed(order):
+            cnet.tensor_backward_step(t.ptr)
 
     def backward(self):
         def build_topo(t, visited, order):
@@ -223,6 +273,13 @@ def sum(a):
     out._children = [a]
     return out
 
+def randn(shape, requires_grad=False, scale=1.0):
+    t = zeros(shape, requires_grad=requires_grad)
+    n = math.prod(shape)
+    for i in range(n):
+        cnet.tensor_set_flat(t.ptr, i, random.gauss(0, scale))
+    return t
+
 def zeros(shape, requires_grad = False):
     t = Tensor.__new__(Tensor)
     t.shape = shape
@@ -231,8 +288,10 @@ def zeros(shape, requires_grad = False):
     return t
 
 def softmax(logits):
-    n = logits.shape[0] * logits.shape[1]
-    values = [cnet.tensor_get_flat(logits.ptr, i) for i in range(n)]
+    n = math.prod(logits.shape)
+    buf = (ctypes.c_float * n)()
+    cnet.tensor_copy_data_to_buffer(logits.ptr, buf)
+    values = list(buf)
     max_val = max(values)
     exps = [math.exp(v - max_val) for v in values]
     total = builtins.sum(exps)
@@ -241,14 +300,43 @@ def softmax(logits):
 def cross_entropy_loss(logits, label):
     probs = softmax(logits)
     loss = -math.log(probs[label] + 1e-8)
-
-    grads = list(probs)
-    grads[label] -= 1.0
-
-    for i, g in enumerate(grads):
+    probs[label] -= 1.0
+    for i, g in enumerate(probs):
         cnet.tensor_set_grad_flat(logits.ptr, i, g)
 
     return loss
+
+class MNISTData:
+    def __init__(self, image_path, label_path):
+        self._ptr = cnet.mnist_load(image_path.encode(), label_path.encode())
+        if not self._ptr:
+            raise RuntimeError(f"Failed to load MNIST: {image_path}, {label_path}")
+        d = self._ptr.contents
+        self.count = d.count
+        self.rows  = d.rows
+        self.cols  = d.cols
+
+    def __del__(self):
+        if self._ptr:
+            cnet.mnist_free(self._ptr)
+            self._ptr = None
+
+    def get_image(self, idx):
+        n = self.rows * self.cols
+        base = idx * n
+        d = self._ptr.contents
+        return [d.images[base + i] for i in range(n)]
+
+    def get_label(self, idx):
+        return self._ptr.contents.labels[idx]
+
+    def get_image_tensor(self, idx):
+        flat = self.get_image(idx)
+        t = zeros((1, self.rows * self.cols))
+        for i, v in enumerate(flat):
+            cnet.tensor_set_flat(t.ptr, i, v)
+        return t
+
 
 if __name__ == "__main__":
     print("=== Test 1: create from data ===")
