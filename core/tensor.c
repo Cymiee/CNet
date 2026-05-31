@@ -116,6 +116,10 @@ void tensor_set_grad_scalar(Tensor *t, float val) {
 }
 
 void tensor_set_grad_flat(Tensor *t, int index, float val) {
+    if (t->grad == NULL) {
+        fprintf(stderr, "tensor_set_grad_flat: grad is NULL (requires_grad not set?)\n");
+        return;
+    }
     if (index < 0 || index >= t->size) {
         fprintf(stderr, "flat index %d out of bounds\n", index);
         return;
@@ -442,14 +446,39 @@ void tensor_backward_step(Tensor *t) {
     t->ctx->backward_fn(t->ctx, t);
 }
 
+#define TOPO_MAX 4096
+
+static int topo_contains(Tensor **arr, int len, Tensor *t) {
+    for (int i = 0; i < len; i++)
+        if (arr[i] == t) return 1;
+    return 0;
+}
+
+static void topo_visit(Tensor *t, Tensor **order, int *olen,
+                        Tensor **visited, int *vlen) {
+    if (topo_contains(visited, *vlen, t)) return;
+    if (*vlen >= TOPO_MAX || *olen >= TOPO_MAX) return;
+    visited[(*vlen)++] = t;
+    if (t->ctx != NULL)
+        for (int i = 0; i < t->ctx->num_inputs; i++)
+            topo_visit(t->ctx->inputs[i], order, olen, visited, vlen);
+    order[(*olen)++] = t;
+}
+
 void tensor_backward(Tensor *t) {
-    if (t->ctx == NULL) return;
-
-    t->ctx->backward_fn(t->ctx, t);
-
-    for (int i = 0; i < t->ctx->num_inputs; i++)
-        if (t->ctx->inputs[i]->requires_grad)
-            tensor_backward(t->ctx->inputs[i]);
+    Tensor **order   = malloc(TOPO_MAX * sizeof(Tensor *));
+    Tensor **visited = malloc(TOPO_MAX * sizeof(Tensor *));
+    if (!order || !visited) {
+        fprintf(stderr, "tensor_backward: malloc failed\n");
+        free(order); free(visited);
+        return;
+    }
+    int olen = 0, vlen = 0;
+    topo_visit(t, order, &olen, visited, &vlen);
+    for (int i = olen - 1; i >= 0; i--)
+        tensor_backward_step(order[i]);
+    free(order);
+    free(visited);
 }
 
 void tensor_copy_data_to_buffer(Tensor *t, float *buf) {

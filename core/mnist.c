@@ -2,10 +2,11 @@
 #include <stdio.h>
 
 int swap_endian(int val) {
-    return ((val >> 24) & 0xFF) | 
-           ((val << 8) & 0xFF0000) | 
-           ((val >> 8) & 0xFF00) | 
-           ((val << 24) & 0xFF000000);
+    unsigned int u = (unsigned int)val;
+    return (int)(((u >> 24) & 0xFF)     |
+                 ((u <<  8) & 0xFF0000) |
+                 ((u >>  8) & 0xFF00)   |
+                 ((u << 24) & 0xFF000000));
 }
 
 MNISTData *mnist_load(const char *image_path, const char *label_path) {

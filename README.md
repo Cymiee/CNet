@@ -31,7 +31,7 @@ and computation graphs implemented explicitly.
 
 ```bash
 # C test binary
-gcc -Wall -Wextra -g -o tensor core/tensor.c core/main.c -lm
+gcc -Wall -Wextra -g -o tensor core/tensor.c core/mnist.c core/main.c -lm
 
 # Python shared library (required before running any Python scripts)
 gcc -shared -fPIC -o python/libcnet.so core/tensor.c core/mnist.c -lm
