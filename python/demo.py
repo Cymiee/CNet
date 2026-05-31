@@ -3,7 +3,7 @@ import os
 import argparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from cnet import MNISTData, matmul, relu, randn, zeros, cross_entropy_loss, save_weights, load_weights
+from cnet import MNISTData, matmul, relu, randn, cross_entropy_loss, save_weights, load_weights
 
 LR      = 0.01
 EPOCHS  = 3
