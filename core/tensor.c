@@ -456,6 +456,10 @@ void tensor_copy_data_to_buffer(Tensor *t, float *buf) {
     memcpy(buf, t->data, t->size * sizeof(float));
 }
 
+void tensor_set_data_from_buffer(Tensor *t, float *buf) {
+    memcpy(t->data, buf, t->size * sizeof(float));
+}
+
 float tensor_get_grad_flat(Tensor *t, int index) {
     return t->grad[index];
 }

@@ -3,6 +3,7 @@ import ctypes
 import math
 import os
 import random
+import struct
 
 _libdir = os.path.dirname(os.path.abspath(__file__))
 cnet = ctypes.CDLL(os.path.join(_libdir, 'libcnet.so'))
@@ -84,6 +85,10 @@ cnet.tensor_sum.argtypes = [ctypes.c_void_p]
 
 cnet.tensor_copy_data_to_buffer.restype = None
 cnet.tensor_copy_data_to_buffer.argtypes = [
+    ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
+
+cnet.tensor_set_data_from_buffer.restype = None
+cnet.tensor_set_data_from_buffer.argtypes = [
     ctypes.c_void_p, ctypes.POINTER(ctypes.c_float)]
 
 cnet.tensor_get_grad_flat.restype  = ctypes.c_float
@@ -305,6 +310,33 @@ def cross_entropy_loss(logits, label):
         cnet.tensor_set_grad_flat(logits.ptr, i, g)
 
     return loss
+
+def save_weights(path, tensors):
+    with open(path, 'wb') as f:
+        f.write(struct.pack('i', len(tensors)))
+        for t in tensors:
+            f.write(struct.pack('i', len(t.shape)))
+            for s in t.shape:
+                f.write(struct.pack('i', s))
+            n = math.prod(t.shape)
+            buf = (ctypes.c_float * n)()
+            cnet.tensor_copy_data_to_buffer(t.ptr, buf)
+            f.write(bytes(buf))
+
+def load_weights(path, tensors):
+    with open(path, 'rb') as f:
+        count = struct.unpack('i', f.read(4))[0]
+        if count != len(tensors):
+            raise ValueError(f"file has {count} tensors, expected {len(tensors)}")
+        for t in tensors:
+            ndim = struct.unpack('i', f.read(4))[0]
+            shape = tuple(struct.unpack('i', f.read(4))[0] for _ in range(ndim))
+            if shape != t.shape:
+                raise ValueError(f"shape mismatch: file has {shape}, tensor is {t.shape}")
+            n = math.prod(shape)
+            buf = (ctypes.c_float * n).from_buffer_copy(f.read(n * 4))
+            cnet.tensor_set_data_from_buffer(t.ptr, buf)
+
 
 class MNISTData:
     def __init__(self, image_path, label_path):
