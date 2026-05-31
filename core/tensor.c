@@ -437,6 +437,11 @@ Tensor *tensor_sum(Tensor *a) {
     return b;
 }
 
+void tensor_backward_step(Tensor *t) {
+    if (t->ctx == NULL) return;
+    t->ctx->backward_fn(t->ctx, t);
+}
+
 void tensor_backward(Tensor *t) {
     if (t->ctx == NULL) return;
 

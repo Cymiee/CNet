@@ -1,3 +1,4 @@
+import builtins
 import ctypes
 import os
 import math
@@ -48,6 +49,9 @@ cnet.tensor_print.argtypes = [ctypes.c_void_p]
 
 cnet.tensor_print_grad.restype = None
 cnet.tensor_print_grad.argtypes = [ctypes.c_void_p]
+
+cnet.tensor_backward_step.restype = None
+cnet.tensor_backward_step.argtypes = [ctypes.c_void_p]
 
 cnet.tensor_backward.restype = None
 cnet.tensor_backward.argtypes = [ctypes.c_void_p]
@@ -147,8 +151,20 @@ class Tensor:
         cnet.tensor_print_grad(self.ptr)
 
     def backward(self):
+        def build_topo(t, visited, order):
+            if id(t) in visited:
+                return
+            visited.add(id(t))
+            for child in getattr(t, '_children', []):
+                build_topo(child, visited, order)
+            order.append(t)
+
+        visited, order = set(), []
+        build_topo(self, visited, order)
+
         cnet.tensor_set_grad_scalar(self.ptr, 1.0)
-        cnet.tensor_backward(self.ptr)
+        for t in reversed(order):
+            cnet.tensor_backward_step(t.ptr)
 
 
 def add(a, b):
@@ -219,15 +235,15 @@ def softmax(logits):
     values = [cnet.tensor_get_flat(logits.ptr, i) for i in range(n)]
     max_val = max(values)
     exps = [math.exp(v - max_val) for v in values]
-    total = sum(exps)
+    total = builtins.sum(exps)
     return [e / total for e in exps]
 
-def cross_entropy_loss(logits, labels):
+def cross_entropy_loss(logits, label):
     probs = softmax(logits)
-    loss = -math.log(probs[labels] + 1e-8)
+    loss = -math.log(probs[label] + 1e-8)
 
     grads = list(probs)
-    grads[labels] -= 1.0
+    grads[label] -= 1.0
 
     for i, g in enumerate(grads):
         cnet.tensor_set_grad_flat(logits.ptr, i, g)

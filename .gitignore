@@ -1,6 +1,9 @@
+.vscode
+.claude
+*.dSYM
+
 ten_*
 tensor
-*.dSYM
 ten
-.vscode
+
 data
