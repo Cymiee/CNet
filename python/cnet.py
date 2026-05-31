@@ -114,6 +114,20 @@ cnet.mnist_free.restype  = None
 cnet.mnist_free.argtypes = [ctypes.POINTER(MNISTDataC)]
 
 
+def broadcast_shape(a_shape, b_shape):
+    out_ndim = max(len(a_shape), len(b_shape))
+    out = []
+    for i in range(out_ndim):
+        ai   = len(a_shape) - out_ndim + i
+        bi   = len(b_shape) - out_ndim + i
+        adim = a_shape[ai] if ai >= 0 else 1
+        bdim = b_shape[bi] if bi >= 0 else 1
+        if   adim == bdim: out.append(adim)
+        elif adim == 1:    out.append(bdim)
+        elif bdim == 1:    out.append(adim)
+        else: raise ValueError(f"shapes {a_shape} and {b_shape} are not broadcastable")
+    return tuple(out)
+
 def to_c_int_arr(*vals):
     arr = (ctypes.c_int * len(vals))(*vals)
     return arr
@@ -225,14 +239,14 @@ class Tensor:
 def add(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_add(a.ptr, b.ptr)
-    out.shape = a.shape
+    out.shape = broadcast_shape(a.shape, b.shape)
     out._children = [a, b]
     return out
 
 def sub(a, b):
     out = Tensor.__new__(Tensor)
     out.ptr = cnet.tensor_sub(a.ptr, b.ptr)
-    out.shape = a.shape
+    out.shape = broadcast_shape(a.shape, b.shape)
     out._children = [a, b]
     return out
     

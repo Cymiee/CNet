@@ -34,14 +34,16 @@ def main():
     args = parser.parse_args()
 
     w1 = zeros((IN_DIM, H))
+    b1 = zeros((1, H))
     w2 = zeros((H, CLASSES))
-    load_weights(args.weights, [w1, w2])
+    b2 = zeros((1, CLASSES))
+    load_weights(args.weights, [w1, b1, w2, b2])
 
     flat       = preprocess(args.image)
     img_tensor = Tensor([flat])                     # (1, 784)
 
-    h      = relu(matmul(img_tensor, w1))           # (1, H)
-    logits = matmul(h, w2)                          # (1, CLASSES)
+    h      = relu(matmul(img_tensor, w1) + b1)      # (1, H)
+    logits = matmul(h, w2) + b2                     # (1, CLASSES)
 
     probs  = softmax(logits)
     top3   = sorted(range(CLASSES), key=lambda i: probs[i], reverse=True)[:3]

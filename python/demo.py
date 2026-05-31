@@ -3,7 +3,7 @@ import os
 import argparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from cnet import MNISTData, matmul, relu, randn, cross_entropy_loss, save_weights, load_weights
+from cnet import MNISTData, matmul, relu, randn, zeros, cross_entropy_loss, save_weights, load_weights
 
 LR      = 0.01
 EPOCHS  = 3
@@ -11,7 +11,7 @@ H       = 128
 IN_DIM  = 784
 CLASSES = 10
 
-def train(data, w1, w2):
+def train(data, w1, b1, w2, b2):
     for epoch in range(EPOCHS):
         total_loss = 0.0
         correct    = 0
@@ -20,17 +20,16 @@ def train(data, w1, w2):
             img   = data.get_image_tensor(idx)   # (1, 784)
             label = data.get_label(idx)
 
-            h      = relu(matmul(img, w1))        # (1, H)
-            logits = matmul(h, w2)                # (1, CLASSES)
+            h      = relu(matmul(img, w1) + b1)  # (1, H)
+            logits = matmul(h, w2) + b2           # (1, CLASSES)
 
             total_loss += cross_entropy_loss(logits, label)
             correct    += int(logits.argmax() == label)
 
             logits.backward_grad_set()
-            w1.sgd_step(LR)
-            w2.sgd_step(LR)
-            w1.zero_grad()
-            w2.zero_grad()
+            for p in [w1, b1, w2, b2]:
+                p.sgd_step(LR)
+                p.zero_grad()
             del logits, h, img  # free intermediate C tensors immediately
 
             if (idx + 1) % 5000 == 0:
@@ -41,13 +40,13 @@ def train(data, w1, w2):
         print(f"Epoch {epoch+1}: loss={total_loss/data.count:.4f}  "
               f"acc={correct/data.count:.3f}")
 
-def evaluate(data, w1, w2):
+def evaluate(data, w1, b1, w2, b2):
     correct = 0
     for idx in range(data.count):
         img   = data.get_image_tensor(idx)
         label = data.get_label(idx)
-        h      = relu(matmul(img, w1))
-        logits = matmul(h, w2)
+        h      = relu(matmul(img, w1) + b1)
+        logits = matmul(h, w2) + b2
         correct += int(logits.argmax() == label)
         del logits, h, img
     print(f"Accuracy: {correct}/{data.count} = {correct/data.count:.3f}")
@@ -61,25 +60,25 @@ def main():
     parser.add_argument('--eval', action='store_true', help='evaluate instead of train (use with --load)')
     args = parser.parse_args()
 
-    # He init: scale = sqrt(2 / fan_in)
-    # Note: no bias terms — adding bias requires broadcasting in tensor_add,
-    # which is not yet implemented. Accuracy is ~2-3% lower than a biased MLP.
+    # He init for weights; biases start at zero
     w1 = randn((IN_DIM, H),       requires_grad=True, scale=(2.0 / IN_DIM) ** 0.5)
+    b1 = zeros((1, H),            requires_grad=True)
     w2 = randn((H,      CLASSES), requires_grad=True, scale=(2.0 / H)      ** 0.5)
+    b2 = zeros((1,      CLASSES), requires_grad=True)
 
     if args.load:
-        load_weights(args.load, [w1, w2])
+        load_weights(args.load, [w1, b1, w2, b2])
         print(f"Loaded weights from {args.load}")
 
     data = MNISTData(args.images, args.labels)
     print(f"Loaded {data.count} samples ({data.rows}x{data.cols})")
 
     if args.eval or args.load:
-        evaluate(data, w1, w2)
+        evaluate(data, w1, b1, w2, b2)
     else:
-        train(data, w1, w2)
+        train(data, w1, b1, w2, b2)
         if args.save:
-            save_weights(args.save, [w1, w2])
+            save_weights(args.save, [w1, b1, w2, b2])
             print(f"Saved weights to {args.save}")
 
 if __name__ == "__main__":

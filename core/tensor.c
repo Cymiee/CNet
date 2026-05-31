@@ -218,22 +218,64 @@ static int tensor_shape_equal(Tensor *a, Tensor *b) {
     return 1;
 }
 
+#define BCAST_MAX_NDIM 8
+
+/* Compute broadcast output shape. Returns 1 on success, 0 if incompatible. */
+static int broadcast_compute_shape(Tensor *a, Tensor *b,
+                                   int *out_shape, int *out_ndim) {
+    *out_ndim = a->ndim > b->ndim ? a->ndim : b->ndim;
+    for (int i = 0; i < *out_ndim; i++) {
+        int ai   = a->ndim - *out_ndim + i;
+        int bi   = b->ndim - *out_ndim + i;
+        int adim = (ai >= 0) ? a->shape[ai] : 1;
+        int bdim = (bi >= 0) ? b->shape[bi] : 1;
+        if      (adim == bdim) out_shape[i] = adim;
+        else if (adim == 1)    out_shape[i] = bdim;
+        else if (bdim == 1)    out_shape[i] = adim;
+        else return 0;
+    }
+    return 1;
+}
+
+/* Given a flat index into `out`, return the flat index into `in`,
+   clamping any broadcast dimensions (size 1) to 0. */
+static int broadcast_flat_idx(int flat_out, Tensor *out, Tensor *in) {
+    int idx[BCAST_MAX_NDIM];
+    int rem = flat_out;
+    for (int i = 0; i < out->ndim; i++) {
+        idx[i] = rem / out->strides[i];
+        rem   %= out->strides[i];
+    }
+    int flat_in = 0;
+    for (int i = 0; i < out->ndim; i++) {
+        int in_i = in->ndim - out->ndim + i;
+        if (in_i < 0) continue;
+        flat_in += (in->shape[in_i] == 1 ? 0 : idx[i]) * in->strides[in_i];
+    }
+    return flat_in;
+}
+
+/* Accumulate grad into input, summing over any broadcast dimensions. */
 static void add_backward(BackwardContext *ctx, Tensor *grad_output) {
     if (ctx->inputs[0]->requires_grad)
-        for (int i = 0; i < ctx->inputs[0]->size; i++)
-            ctx->inputs[0]->grad[i] += grad_output->grad[i];
+        for (int i = 0; i < grad_output->size; i++)
+            ctx->inputs[0]->grad[broadcast_flat_idx(i, grad_output, ctx->inputs[0])]
+                += grad_output->grad[i];
     if (ctx->inputs[1]->requires_grad)
-        for (int i = 0; i < ctx->inputs[1]->size; i++)
-            ctx->inputs[1]->grad[i] += grad_output->grad[i];
+        for (int i = 0; i < grad_output->size; i++)
+            ctx->inputs[1]->grad[broadcast_flat_idx(i, grad_output, ctx->inputs[1])]
+                += grad_output->grad[i];
 }
 
 static void sub_backward(BackwardContext *ctx, Tensor *grad_output) {
     if (ctx->inputs[0]->requires_grad)
-        for (int i = 0; i < ctx->inputs[0]->size; i++)
-            ctx->inputs[0]->grad[i] += grad_output->grad[i];
+        for (int i = 0; i < grad_output->size; i++)
+            ctx->inputs[0]->grad[broadcast_flat_idx(i, grad_output, ctx->inputs[0])]
+                += grad_output->grad[i];
     if (ctx->inputs[1]->requires_grad)
-        for (int i = 0; i < ctx->inputs[1]->size; i++)
-            ctx->inputs[1]->grad[i] -= grad_output->grad[i];
+        for (int i = 0; i < grad_output->size; i++)
+            ctx->inputs[1]->grad[broadcast_flat_idx(i, grad_output, ctx->inputs[1])]
+                -= grad_output->grad[i];
 }
 
 static void mul_backward(BackwardContext *ctx, Tensor *grad_output) {
@@ -292,14 +334,16 @@ static void matmul_backward(BackwardContext *ctx, Tensor *grad_output) {
 }
 
 Tensor *tensor_add(Tensor *a, Tensor *b) {
-    if (!tensor_shape_equal(a, b)) {
-        fprintf(stderr, "tensor shapes not equal, cannot add\n");
+    int out_shape[BCAST_MAX_NDIM], out_ndim;
+    if (!broadcast_compute_shape(a, b, out_shape, &out_ndim)) {
+        fprintf(stderr, "tensor_add: shapes not broadcastable\n");
         return NULL;
     }
-    int dim = a->ndim, *shape = a->shape, size = a->size;
-    Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
-    for (int i = 0; i < size; i++)
-        c->data[i] = a->data[i] + b->data[i];
+    Tensor *c = tensor_create(out_ndim, out_shape, a->requires_grad || b->requires_grad);
+    if (c == NULL) return NULL;
+    for (int i = 0; i < c->size; i++)
+        c->data[i] = a->data[broadcast_flat_idx(i, c, a)]
+                   + b->data[broadcast_flat_idx(i, c, b)];
 
     if (a->requires_grad || b->requires_grad) {
         BackwardContext *ctx = backward_context_create(2, c, add_backward);
@@ -312,14 +356,16 @@ Tensor *tensor_add(Tensor *a, Tensor *b) {
 }
 
 Tensor *tensor_sub(Tensor *a, Tensor *b) {
-    if (!tensor_shape_equal(a, b)) {
-        fprintf(stderr, "tensor shapes not equal, cannot subtract\n");
+    int out_shape[BCAST_MAX_NDIM], out_ndim;
+    if (!broadcast_compute_shape(a, b, out_shape, &out_ndim)) {
+        fprintf(stderr, "tensor_sub: shapes not broadcastable\n");
         return NULL;
     }
-    int dim = a->ndim, *shape = a->shape, size = a->size;
-    Tensor *c = tensor_create(dim, shape, a->requires_grad || b->requires_grad);
-    for (int i = 0; i < size; i++)
-        c->data[i] = a->data[i] - b->data[i];
+    Tensor *c = tensor_create(out_ndim, out_shape, a->requires_grad || b->requires_grad);
+    if (c == NULL) return NULL;
+    for (int i = 0; i < c->size; i++)
+        c->data[i] = a->data[broadcast_flat_idx(i, c, a)]
+                   - b->data[broadcast_flat_idx(i, c, b)];
 
     if (a->requires_grad || b->requires_grad) {
         BackwardContext *ctx = backward_context_create(2, c, sub_backward);
