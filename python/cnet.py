@@ -97,6 +97,12 @@ cnet.tensor_get_grad_flat.argtypes = [ctypes.c_void_p, ctypes.c_int]
 cnet.tensor_sgd_step.restype  = None
 cnet.tensor_sgd_step.argtypes = [ctypes.c_void_p, ctypes.c_float]
 
+cnet.tensor_adam_step.restype  = None
+cnet.tensor_adam_step.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,  # param, m, v
+    ctypes.c_float, ctypes.c_float, ctypes.c_float,      # lr, beta1, beta2
+    ctypes.c_float, ctypes.c_int]                         # eps, t
+
 # MNIST
 class MNISTDataC(ctypes.Structure):
     _fields_ = [
@@ -322,8 +328,69 @@ def cross_entropy_loss(logits, label):
     probs[label] -= 1.0
     for i, g in enumerate(probs):
         cnet.tensor_set_grad_flat(logits.ptr, i, g)
-
     return loss
+
+
+def cross_entropy_loss_batch(logits, labels):
+    """Mean cross-entropy over a batch.
+
+    logits : Tensor of shape (B, C)
+    labels : list of B int class indices
+    Returns mean loss (float) and sets logits.grad = (softmax - one_hot) / B.
+    """
+    B, C = logits.shape
+    buf = (ctypes.c_float * (B * C))()
+    cnet.tensor_copy_data_to_buffer(logits.ptr, buf)
+
+    total_loss = 0.0
+    grad = [0.0] * (B * C)
+    for b in range(B):
+        row = buf[b * C:(b + 1) * C]
+        max_v = max(row)
+        exps = [math.exp(v - max_v) for v in row]
+        s = builtins.sum(exps)
+        probs = [e / s for e in exps]
+        total_loss += -math.log(probs[labels[b]] + 1e-8)
+        for c in range(C):
+            grad[b * C + c] = probs[c] - (1.0 if c == labels[b] else 0.0)
+
+    inv_B = 1.0 / B
+    for i in range(B * C):
+        cnet.tensor_set_grad_flat(logits.ptr, i, grad[i] * inv_B)
+
+    return total_loss / B
+
+
+def argmax_rows(t):
+    """Return a list of per-row argmax indices for a 2-D Tensor."""
+    B, C = t.shape
+    buf = (ctypes.c_float * (B * C))()
+    cnet.tensor_copy_data_to_buffer(t.ptr, buf)
+    return [max(range(C), key=lambda c: buf[b * C + c]) for b in range(B)]
+
+class Adam:
+    def __init__(self, params, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8):
+        self.params = params
+        self.lr     = lr
+        self.beta1  = beta1
+        self.beta2  = beta2
+        self.eps    = eps
+        self.t      = 0
+        # moment buffers — same shape as each param, no grad needed
+        self.m = [zeros(p.shape) for p in params]
+        self.v = [zeros(p.shape) for p in params]
+
+    def step(self):
+        self.t += 1
+        for p, m, v in zip(self.params, self.m, self.v):
+            cnet.tensor_adam_step(p.ptr, m.ptr, v.ptr,
+                                  self.lr, self.beta1, self.beta2,
+                                  self.eps, self.t)
+
+    def zero_grad(self):
+        for p in self.params:
+            cnet.tensor_zero_grad(p.ptr)
+
 
 def save_weights(path, tensors):
     with open(path, 'wb') as f:
@@ -382,6 +449,25 @@ class MNISTData:
         for i, v in enumerate(flat):
             cnet.tensor_set_flat(t.ptr, i, v)
         return t
+
+    def get_batch_tensor(self, indices):
+        """Return (imgs, labels) where imgs is a (B, rows*cols) Tensor."""
+        B = len(indices)
+        n = self.rows * self.cols
+        d = self._ptr.contents
+        buf = (ctypes.c_float * (B * n))()
+        float_bytes  = ctypes.sizeof(ctypes.c_float)
+        images_addr  = ctypes.cast(d.images, ctypes.c_void_p).value
+        for i, idx in enumerate(indices):
+            ctypes.memmove(
+                ctypes.addressof(buf) + i * n * float_bytes,
+                images_addr + idx * n * float_bytes,
+                n * float_bytes,
+            )
+        t = zeros((B, n))
+        cnet.tensor_set_data_from_buffer(t.ptr, buf)
+        labels = [d.labels[idx] for idx in indices]
+        return t, labels
 
 
 if __name__ == "__main__":

@@ -1,54 +1,67 @@
 import sys
 import os
 import argparse
+import random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from cnet import MNISTData, matmul, relu, randn, zeros, cross_entropy_loss, save_weights, load_weights
+from cnet import (MNISTData, matmul, relu, randn, zeros,
+                  cross_entropy_loss_batch, argmax_rows,
+                  save_weights, load_weights, Adam)
 
-LR      = 0.01
-EPOCHS  = 3
-H       = 128
-IN_DIM  = 784
-CLASSES = 10
+LR         = 0.001
+EPOCHS     = 3
+H          = 512
+IN_DIM     = 784
+CLASSES    = 10
+BATCH_SIZE = 64
 
 def train(data, w1, b1, w2, b2):
+    opt     = Adam([w1, b1, w2, b2], lr=LR)
+    indices = list(range(data.count))
+
     for epoch in range(EPOCHS):
+        random.shuffle(indices)
         total_loss = 0.0
         correct    = 0
+        seen       = 0
 
-        for idx in range(data.count):
-            img   = data.get_image_tensor(idx)   # (1, 784)
-            label = data.get_label(idx)
+        for start in range(0, data.count, BATCH_SIZE):
+            batch_idx      = indices[start:start + BATCH_SIZE]
+            imgs, labels   = data.get_batch_tensor(batch_idx)   # (B, 784)
 
-            h      = relu(matmul(img, w1) + b1)  # (1, H)
-            logits = matmul(h, w2) + b2           # (1, CLASSES)
+            h      = relu(matmul(imgs, w1) + b1)                # (B, H)
+            logits = matmul(h, w2) + b2                         # (B, CLASSES)
 
-            total_loss += cross_entropy_loss(logits, label)
-            correct    += int(logits.argmax() == label)
+            batch_loss  = cross_entropy_loss_batch(logits, labels)
+            preds       = argmax_rows(logits)
+            B           = len(batch_idx)
+            total_loss += batch_loss * B
+            correct    += sum(p == l for p, l in zip(preds, labels))
+            seen       += B
 
             logits.backward_grad_set()
-            for p in [w1, b1, w2, b2]:
-                p.sgd_step(LR)
-                p.zero_grad()
-            del logits, h, img  # free intermediate C tensors immediately
+            opt.step()
+            opt.zero_grad()
+            del logits, h, imgs
 
-            if (idx + 1) % 5000 == 0:
-                print(f"  epoch {epoch+1} [{idx+1:>5}/{data.count}]  "
-                      f"loss={total_loss/(idx+1):.4f}  "
-                      f"acc={correct/(idx+1):.3f}")
+            if seen % 5000 < BATCH_SIZE:
+                print(f"  epoch {epoch+1} [{seen:>5}/{data.count}]  "
+                      f"loss={total_loss/seen:.4f}  "
+                      f"acc={correct/seen:.3f}")
 
         print(f"Epoch {epoch+1}: loss={total_loss/data.count:.4f}  "
               f"acc={correct/data.count:.3f}")
 
 def evaluate(data, w1, b1, w2, b2):
     correct = 0
-    for idx in range(data.count):
-        img   = data.get_image_tensor(idx)
-        label = data.get_label(idx)
-        h      = relu(matmul(img, w1) + b1)
+    for start in range(0, data.count, BATCH_SIZE):
+        batch_idx    = list(range(start, min(start + BATCH_SIZE, data.count)))
+        imgs, labels = data.get_batch_tensor(batch_idx)
+        h      = relu(matmul(imgs, w1) + b1)
         logits = matmul(h, w2) + b2
-        correct += int(logits.argmax() == label)
-        del logits, h, img
+        preds  = argmax_rows(logits)
+        correct += sum(p == l for p, l in zip(preds, labels))
+        del logits, h, imgs
     print(f"Accuracy: {correct}/{data.count} = {correct/data.count:.3f}")
 
 def main():

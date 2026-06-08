@@ -10,7 +10,7 @@ from cnet import matmul, relu, zeros, load_weights, softmax, Tensor
 
 CANVAS_SIZE = 280   # 10x MNIST (28x28)
 BRUSH       = 18    # scales to ~1.8px at 28x28 — thick enough to recognise
-H           = 128
+H           = 512
 IN_DIM      = 784
 CLASSES     = 10
 DEBOUNCE_MS = 40    # re-run inference at most every 40ms while drawing
@@ -111,11 +111,25 @@ class DrawApp:
 
     def _run_inference(self):
         self._after_id = None
-        small  = self._pil_img.resize((28, 28), Image.LANCZOS)
+
+        # Crop to bounding box of drawn pixels, re-center with padding,
+        # then resize to 28x28 — matches how MNIST images are prepared.
+        bbox = self._pil_img.getbbox()           # None if completely white
+        if bbox is None:
+            self._set_blank()
+            return
+
+        digit  = self._pil_img.crop(bbox)
+        pad    = max(digit.size) // 5            # ~20% padding on each side
+        padded = Image.new('L', (digit.width  + pad * 2,
+                                 digit.height + pad * 2), 255)
+        padded.paste(digit, (pad, pad))
+        small  = padded.resize((28, 28), Image.LANCZOS)
+
         pixels = list(small.getdata())           # 0 = black, 255 = white
         flat   = [(255 - p) / 255.0 for p in pixels]  # invert → MNIST convention
 
-        if max(flat) < 0.05:                     # blank canvas
+        if max(flat) < 0.05:
             self._set_blank()
             return
 

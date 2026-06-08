@@ -11,21 +11,29 @@ except ImportError:
 
 from cnet import matmul, relu, zeros, load_weights, softmax, Tensor
 
-H       = 128
+H       = 512
 IN_DIM  = 784
 CLASSES = 10
 
 def preprocess(image_path):
     img = Image.open(image_path).convert('L')       # grayscale
-    img = img.resize((28, 28), Image.LANCZOS)       # resize to MNIST dims
-    pixels = list(img.getdata())                     # flat list, 0-255
 
-    # MNIST convention: white digit on black background.
-    # Most drawing apps give black on white — auto-invert if background is light.
+    # Auto-invert if background is light (drawing apps give black on white)
+    pixels = list(img.getdata())
     if sum(pixels) / len(pixels) > 127:
-        pixels = [255 - p for p in pixels]
+        img = img.point(lambda p: 255 - p)
 
-    return [p / 255.0 for p in pixels]
+    # Crop to bounding box and re-center with padding — matches MNIST preprocessing
+    bbox = img.getbbox()
+    if bbox:
+        digit  = img.crop(bbox)
+        pad    = max(digit.size) // 5
+        padded = Image.new('L', (digit.width + pad*2, digit.height + pad*2), 0)
+        padded.paste(digit, (pad, pad))
+        img    = padded
+
+    img = img.resize((28, 28), Image.LANCZOS)
+    return [p / 255.0 for p in img.getdata()]
 
 def main():
     parser = argparse.ArgumentParser(description="Predict a handwritten digit")

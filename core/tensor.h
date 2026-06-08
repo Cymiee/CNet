@@ -54,5 +54,7 @@ void tensor_copy_data_to_buffer(Tensor *t, float *buf);
 void tensor_set_data_from_buffer(Tensor *t, float *buf);
 float tensor_get_grad_flat(Tensor *t, int index);
 void tensor_sgd_step(Tensor *t, float lr);
+void tensor_adam_step(Tensor *param, Tensor *m, Tensor *v,
+                      float lr, float beta1, float beta2, float eps, int t);
 
 #endif

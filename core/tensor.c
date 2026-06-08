@@ -543,3 +543,17 @@ void tensor_sgd_step(Tensor *t, float lr) {
     for (int i = 0; i < t->size; i++)
         t->data[i] -= lr * t->grad[i];
 }
+
+void tensor_adam_step(Tensor *param, Tensor *m, Tensor *v,
+                      float lr, float beta1, float beta2, float eps, int t) {
+    float bc1 = 1.0f - powf(beta1, (float)t);
+    float bc2 = 1.0f - powf(beta2, (float)t);
+    for (int i = 0; i < param->size; i++) {
+        float g   = param->grad[i];
+        m->data[i] = beta1 * m->data[i] + (1.0f - beta1) * g;
+        v->data[i] = beta2 * v->data[i] + (1.0f - beta2) * g * g;
+        float m_hat = m->data[i] / bc1;
+        float v_hat = v->data[i] / bc2;
+        param->data[i] -= lr * m_hat / (sqrtf(v_hat) + eps);
+    }
+}
