@@ -39,7 +39,7 @@ class DrawApp:
         self.canvas.pack()
 
         tk.Button(canvas_frame, text='Clear', command=self._clear,
-                  bg='#333', fg='white', activebackground='#555',
+                  bg='#333', fg='black', activebackground='#555',
                   activeforeground='white', relief='flat',
                   font=('Helvetica', 12), padx=16, pady=6).pack(pady=(10, 0))
 
