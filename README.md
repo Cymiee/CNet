@@ -17,6 +17,7 @@ behind `loss.backward()`.
 ---
 
 ## Demo
+<img width="1388" height="1068" alt="Screen Recording 2026-06-20 at 12 33 50 PM" src="https://github.com/user-attachments/assets/fbd8cd25-43d5-447c-9ecd-c9995ece7087" />
 
 
 ```
