@@ -1,57 +1,89 @@
-# CNet — Neural Network Framework in C
+# CNet — A Neural Network Framework in C
 
-A deep learning framework built from scratch in pure C,
-with no external libraries. Implements tensors with N-dimensional
-stride-based indexing, automatic differentiation via a computation
-graph, and a training loop targeting MNIST classification.
+A deep learning framework built from scratch in pure C, with no external libraries.
+N-dimensional tensors, automatic differentiation, and a full training loop — then
+wrapped in a Python API so you can define and train a network in a few lines.
 
-Built as a systems + ML portfolio project to understand what sits
-beneath frameworks like PyTorch — memory layout, gradient flow,
-and computation graphs implemented explicitly.
+Trains a 2-layer MLP on MNIST to **97.7% test accuracy**, and ships a live drawing
+app where you scribble a digit and watch the prediction update in real time.
 
-## Architecture
-- **Tensor engine** — N-D tensors, flat memory, stride arithmetic
-- **Autograd** — DAG-based computation graph, `backward()` via function pointers
-- **Python bindings** — ctypes interface to the C core (`python/cnet.py`)
-- **MNIST loader** — IDX binary parser, normalizes pixels to [0, 1]
-- **Training** — SGD, cross-entropy loss, save/load weights
+Built to understand what sits beneath frameworks like PyTorch — memory layout,
+gradient flow, and computation graphs implemented explicitly rather than hidden
+behind `loss.backward()`.
+
+> I wrote every line myself and used an AI assistant as a reviewer and rubber duck,
+> not a code generator — every design decision here is one I can explain.
+
+---
+
+## Demo
+
+
+```
+Epoch 1:  loss 0.23   train acc 93.4%
+Epoch 2:  loss 0.09   train acc 97.4%
+Epoch 3:  loss 0.06   train acc 98.2%
+
+Test set: 97.7%   (10,000 held-out images)
+```
+
+---
+
+## What's inside
+
+- **Tensor engine** — N-dimensional tensors, flat memory, stride-based indexing
+- **Autograd** — a dynamically-built computation graph; `backward()` walks it in
+  reverse via per-op function pointers (C has no closures, so the "context" each
+  backward needs is captured by hand in a `BackwardContext` struct)
+- **Gradient checking** — every backward function is verified numerically against
+  finite differences; this is what makes the rest trustworthy
+- **Operations** — add, sub, mul, matmul, ReLU, sigmoid, log, sum, with broadcasting
+- **Training** — batched forward/backward, cross-entropy loss, **Adam** optimizer,
+  He initialization, save/load weights
+- **MNIST loader** — IDX binary parser in C (handles big-endian, normalizes to [0,1])
+- **Python bindings** — a ctypes wrapper with a `Tensor` class and operator
+  overloading, so training code reads almost like PyTorch
+- **Inference** — predict from an image file, or draw live in a GUI canvas
 
 ## Status
-- [x] Tensor engine — N-D tensors, stride arithmetic, 9 ops
-- [x] Autograd — BackwardContext, backward() for all ops, gradient check passing
-- [x] Python bindings — ctypes wrapper, Tensor class, operator overloading
-- [x] MNIST training — 2-layer MLP (784→128→10), ~97% train accuracy
-- [x] Save/load weights
-- [x] Digit prediction from image
-- [ ] CNNs
+- [x] Tensor engine — N-D tensors, stride arithmetic
+- [x] Autograd — `BackwardContext`, backward for all ops, **gradient check passing**
+- [x] Python bindings — ctypes wrapper, `Tensor` class, operator overloading
+- [x] Batching + broadcasting + bias layers
+- [x] MNIST training — 784→512→10 MLP, Adam, **97.7% test accuracy**
+- [x] Save / load weights
+- [x] Live drawing app + image prediction
+- [ ] Convolutional layers (next)
 
 ---
 
 ## Build
 
 ```bash
-# C test binary
+# C test binary (forward-pass tests + gradient check)
 gcc -Wall -Wextra -g -o tensor core/tensor.c core/mnist.c core/main.c -lm
 
-# Python shared library (required before running any Python scripts)
-gcc -shared -fPIC -o python/libcnet.so core/tensor.c core/mnist.c -lm
+# Python shared library — required before running any Python script
+gcc -O2 -shared -fPIC -o python/libcnet.so core/tensor.c core/mnist.c -lm
 ```
+
+Recompile the shared library any time you change the C source.
 
 ---
 
-## Run C Tests
+## Get the MNIST data
+
+The original LeCun mirror is unreliable. Easiest path:
 
 ```bash
-./tensor ops        # forward pass tests
-./tensor autograd   # gradient check + backward tests
+mkdir -p data && cd data
+curl -O https://raw.githubusercontent.com/fgnt/mnist/master/train-images-idx3-ubyte.gz
+curl -O https://raw.githubusercontent.com/fgnt/mnist/master/train-labels-idx1-ubyte.gz
+curl -O https://raw.githubusercontent.com/fgnt/mnist/master/t10k-images-idx3-ubyte.gz
+curl -O https://raw.githubusercontent.com/fgnt/mnist/master/t10k-labels-idx1-ubyte.gz
+gunzip *.gz
+cd ..
 ```
-
----
-
-## MNIST Dataset
-
-Download the 4 IDX binary files from [yann.lecun.com/exdb/mnist](http://yann.lecun.com/exdb/mnist)
-or mirror at [ossci-datasets.s3.amazonaws.com](https://ossci-datasets.s3.amazonaws.com/mnist/):
 
 | File | Contents |
 |------|----------|
@@ -62,63 +94,43 @@ or mirror at [ossci-datasets.s3.amazonaws.com](https://ossci-datasets.s3.amazona
 
 ---
 
-## Training
+## Train
 
 ```bash
-# Train for 3 epochs and save weights
-python3 python/demo.py train-images-idx3-ubyte train-labels-idx1-ubyte --save weights.bin
-
-# Train without saving
-python3 python/demo.py train-images-idx3-ubyte train-labels-idx1-ubyte
+python3 python/demo.py data/train-images-idx3-ubyte data/train-labels-idx1-ubyte --save weights.bin
 ```
 
-Progress is printed every 5,000 steps:
+Progress prints periodically:
 ```
-  epoch 1 [ 5000/60000]  loss=0.8312  acc=0.764
-  epoch 1 [10000/60000]  loss=0.6201  acc=0.823
+  epoch 1 [ 5056/60000]  loss=0.6749  acc=0.813
   ...
-Epoch 1: loss=0.3744  acc=0.893
+Epoch 1: loss=0.2289  acc=0.934
+```
+
+## Evaluate on the test set
+
+```bash
+python3 python/demo.py data/t10k-images-idx3-ubyte data/t10k-labels-idx1-ubyte --load weights.bin
+# Accuracy: 9770/10000 = 0.977
 ```
 
 ---
 
-## Evaluation
+## Draw a digit (live)
+
+Scribble with your mouse/trackpad and watch the prediction and per-digit
+confidence update in real time:
 
 ```bash
-# Evaluate saved weights on the test set
-python3 python/demo.py t10k-images-idx3-ubyte t10k-labels-idx1-ubyte --load weights.bin
-```
-
----
-
-## Live Drawing App
-
-Draw a digit with your mouse/trackpad and see predictions update in real time:
-
-```bash
+pip install Pillow        # tkinter ships with Python on macOS
 python3 python/draw.py weights.bin
 ```
 
-Requires Pillow and tkinter (tkinter ships with Python on macOS):
-```bash
-pip install Pillow
-```
+## Predict from an image file
 
----
-
-## Predict from Image
-
-Requires [Pillow](https://pillow.readthedocs.io):
-```bash
-pip install Pillow
-```
-
-Draw a digit (white or dark background both work — auto-detected) and run:
 ```bash
 python3 python/predict.py weights.bin your_digit.png
 ```
-
-Output:
 ```
 Prediction: 3
 Top 3:
@@ -127,42 +139,62 @@ Top 3:
   3. digit 5  (1.3%)
 ```
 
-**Tips for best accuracy:**
-- Draw on a ~200×200+ canvas, centered, thick strokes
-- Save as PNG
-- The image is auto-resized to 28×28 internally
+Light or dark background both work (auto-detected). The image is cropped to the
+digit, padded, and resized to 28×28 to match MNIST's preprocessing — without that
+step, hand-drawn input doesn't match what the network trained on.
+
+---
+
+## C tests
+
+```bash
+./tensor ops        # forward-pass tests
+./tensor autograd   # gradient check + backward tests
+./tensor mnist      # loader sanity check
+```
 
 ---
 
 ## Python API
 
 ```python
-from cnet import Tensor, matmul, relu, zeros, randn, softmax
-from cnet import cross_entropy_loss, save_weights, load_weights, MNISTData
+from cnet import (Tensor, matmul, relu, zeros, randn, softmax,
+                  cross_entropy_loss_batch, save_weights, load_weights,
+                  Adam, MNISTData)
 
-# Create tensors
+# Tensors — operator overloading for +, -, *, @
 a = Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-b = zeros((2, 2), requires_grad=True)
-c = randn((784, 128), requires_grad=True, scale=0.01)
+w = randn((784, 512), requires_grad=True, scale=(2.0/784)**0.5)  # He init
 
-# Ops (operator overloading supported: +, -, *, @)
-h = relu(a @ b)
-loss = cross_entropy_loss(h, label=0)
+# Forward
+h      = relu(matmul(imgs, w1) + b1)
+logits = matmul(h, w2) + b2
+loss   = cross_entropy_loss_batch(logits, labels)   # sets logits.grad
 
-# Autograd
-h.backward_grad_set()   # when grad is pre-set (e.g. after cross_entropy_loss)
-h.backward()            # standard backward from scalar loss
-
-# SGD
-w.sgd_step(lr=0.01)
-w.zero_grad()
+# Backward + Adam
+opt = Adam([w1, b1, w2, b2], lr=0.001)
+logits.backward_grad_set()   # grad already set by the loss
+opt.step()
+opt.zero_grad()
 
 # Weights
-save_weights("weights.bin", [w1, w2])
-load_weights("weights.bin", [w1, w2])
+save_weights("weights.bin", [w1, b1, w2, b2])
+load_weights("weights.bin", [w1, b1, w2, b2])
 
-# MNIST loader
-data = MNISTData("train-images-idx3-ubyte", "train-labels-idx1-ubyte")
-img  = data.get_image_tensor(0)   # Tensor, shape (1, 784)
-lbl  = data.get_label(0)          # int 0-9
+# MNIST
+data = MNISTData("data/train-images-idx3-ubyte", "data/train-labels-idx1-ubyte")
+imgs, labels = data.get_batch_tensor(range(64))   # (64, 784) Tensor + labels
 ```
+
+---
+
+## Why C
+
+The constraints are the point. No garbage collector means deciding who owns every
+tensor in the graph. No closures means the backward pass for each op has to capture
+its context by hand. No operator overloading on the C side means the math is fully
+explicit. If you can implement backprop under those constraints — and prove it with
+a gradient check — you understand it at a level that calling `loss.backward()` never
+teaches.
+
+The companion write-up goes deeper: (I will put a link to my blog here soon).
