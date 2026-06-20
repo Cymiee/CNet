@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cnet import matmul, relu, zeros, load_weights, softmax, Tensor
 
 CANVAS_SIZE = 280   # 10x MNIST (28x28)
-BRUSH       = 18    # scales to ~1.8px at 28x28 — thick enough to recognise
+BRUSH       = 10    # scales to ~1px at 28x28
 H           = 512
 IN_DIM      = 784
 CLASSES     = 10
@@ -120,11 +120,12 @@ class DrawApp:
             return
 
         digit  = self._pil_img.crop(bbox)
-        pad    = max(digit.size) // 5            # ~20% padding on each side
-        padded = Image.new('L', (digit.width  + pad * 2,
-                                 digit.height + pad * 2), 255)
-        padded.paste(digit, (pad, pad))
-        small  = padded.resize((28, 28), Image.LANCZOS)
+        # Match MNIST preprocessing: content fits in 20x20, centered in 28x28
+        digit.thumbnail((20, 20), Image.LANCZOS)
+        small  = Image.new('L', (28, 28), 255)
+        x_off  = (28 - digit.width)  // 2
+        y_off  = (28 - digit.height) // 2
+        small.paste(digit, (x_off, y_off))
 
         pixels = list(small.getdata())           # 0 = black, 255 = white
         flat   = [(255 - p) / 255.0 for p in pixels]  # invert → MNIST convention
