@@ -1,15 +1,15 @@
 {
     "configurations": [
         {
-            "name": "Mac",
+            "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include"
             ],
-            "defines": [],
-            "macFrameworkPath": [],
-            "compilerPath": "/usr/bin/gcc",
+            "compilerPath": "D:/Programming/IDEs/Microsoft Visual Studio/18/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/cl.exe",
+            "intelliSenseMode": "windows-msvc-x64",
             "cStandard": "c11",
-            "intelliSenseMode": "macos-gcc-arm64"
+            "cppStandard": "c++17"
         }
     ],
     "version": 4

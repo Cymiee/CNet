@@ -1,10 +1,11 @@
 .vscode
 .claude
 *.dSYM
+.exe
 
 ten_*
 tensor
 ten
 
 data
-scratch
+
