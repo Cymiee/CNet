@@ -21,7 +21,7 @@ Tensor *tensor_create_stub(int size) {
     Tensor *tensor = (Tensor *)malloc(sizeof(Tensor));
 
     if (!tensor) {
-        fprintf(stderr, "Failed to allocate memery for Tensor\n");
+        fprintf(stderr, "Failed to allocate memory for Tensor\n");
         return NULL;
     }
 
@@ -39,5 +39,42 @@ Tensor *tensor_create_stub(int size) {
 
 
 int main() {
+    Tensor *tensor = tensor_create_stub(10);
+    if (!tensor) {
+        return EXIT_FAILURE;
+    }
+
+    // Initialize the tensor data
+    for (int i = 0; i < tensor->size; i++) {
+        tensor->data[i] = (float)i;
+    }
+
+    size_t bytes = tensor->size * sizeof(float);
+    float *d_data;
+    CUDA_CHECK(cudaMalloc(&d_data, bytes));
+    CUDA_CHECK(cudaMemcpy(d_data, tensor->data, bytes, cudaMemcpyHostToDevice));
+
+    float *roundtripped = (float *)malloc(bytes);
+    CUDA_CHECK(cudaMemcpy(roundtripped, d_data, bytes, cudaMemcpyDeviceToHost));
+
+    bool success = true;
+    for (int i = 0; i < tensor->size; i++) {
+        if (tensor->data[i] != roundtripped[i]) {
+            success = false;
+            break;
+        }
+    }
+
+    if (success) {
+        printf("Roundtrip successful!\n");
+    } else {
+        printf("Roundtrip failed!\n");
+    }
+
+    cudaFree(d_data);
+    free(roundtripped);
+    free(tensor->data);
+    free(tensor);
+
     return 0;
 }
