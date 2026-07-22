@@ -27,55 +27,59 @@ __global__ void matmul(float *A, float *B, float *C, int M, int K, int N) {
 }
 
 int main() {
-    float *h_inputa, *h_inputb, *h_output;
-    int n = 1000;
-    size_t size = n * sizeof(float);
+    float *h_A, *h_B, *h_C;
+    int M = 512, K = 512, N = 512;
+    size_t size_A = M * K * sizeof(float);
+    size_t size_B = K * N * sizeof(float);
+    size_t size_C = M * N * sizeof(float);
 
-    h_inputa = (float *)malloc(n * sizeof(float));
-    h_inputb = (float *)malloc(n * sizeof(float));
-    h_output = (float *)malloc(n * sizeof(float));
-    for (int i = 0; i < n; ++i) {
-        h_inputa[i] = (float)(rand() % 20 - 10);
-        h_inputb[i] = (float)(rand() % 20 - 10);
+    h_A = (float *)malloc(size_A);
+    h_B = (float *)malloc(size_B);
+    h_C = (float *)malloc(size_C);
+
+    for (int i = 0; i < M * K; ++i) {
+        h_A[i] = (float)(rand()/RAND_MAX);
+    }
+    for (int i = 0; i < K * N; ++i) {
+        h_B[i] = (float)(rand()/RAND_MAX);
     }
 
-    float *d_inputa, *d_inputb, *d_output;
-    CUDA_CHECK(cudaMalloc(&d_inputa, n * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&d_inputb, n * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&d_output, n * sizeof(float)));
+    float *d_A, *d_B, *d_C;
+    CUDA_CHECK(cudaMalloc(&d_A, size_A));
+    CUDA_CHECK(cudaMalloc(&d_B, size_B));
+    CUDA_CHECK(cudaMalloc(&d_C, size_C));
 
-    int threadsPerBlock = 256;
-    int numBlocks = (n + threadsPerBlock - 1) / threadsPerBlock;
+    CUDA_CHECK(cudaMemcpy(d_A, h_A, size_A, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, h_B, size_B, cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cudaMemcpy(d_inputa, h_inputa, size, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_inputb, h_inputb, size, cudaMemcpyHostToDevice));
-    add<<<numBlocks, threadsPerBlock>>>(d_inputa, d_inputb, d_output, n);
-    CUDA_CHECK(cudaMemcpy(h_output, d_output, size, cudaMemcpyDeviceToHost));
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-    //check if the output is correct
-    float *expected_output = (float *)malloc(n * sizeof(float));
-    for (int i = 0; i < n; ++i) {
-        expected_output[i] = h_inputa[i] + h_inputb[i];
-    }
-    int correct = 1;
-    for (int i = 0; i < n; ++i) {
-        if (fabsf(h_output[i] - expected_output[i]) > 1e-5) {
-            correct = 0;
-            break;
+    matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N);
+    CUDA_CHECK(cudaMemcpy(h_C, d_C, size_C, cudaMemcpyDeviceToHost));
+
+    float *expected = (float *)malloc(size_C);
+    for (int row = 0; row < M; ++row) {
+        for (int col = 0; col < N; ++col) {
+            float sum = 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += h_A[row * K + k] * h_B[k * N + col];
+            }
+            expected[row * N + col] = sum;
         }
     }
-
-    if (correct) {
-        printf("Add kernel executed successfully!\n");
-    } else {
-        printf("Add kernel failed!\n");
+    int correct = 1;
+    for (int i = 0; i < M * N; ++i) {
+        if (fabsf(h_C[i] - expected[i]) > 1e-3f) { correct = 0; break; }
     }
+    printf(correct ? "Matmul PASS\n" : "Matmul FAIL\n");
+    free(expected);
 
-    free(h_inputa);
-    free(h_inputb);
-    free(h_output);
-    free(expected_output);
-    CUDA_CHECK(cudaFree(d_inputa));
-    CUDA_CHECK(cudaFree(d_inputb));
-    CUDA_CHECK(cudaFree(d_output));
+    CUDA_CHECK(cudaFree(d_A));
+    CUDA_CHECK(cudaFree(d_B));
+    CUDA_CHECK(cudaFree(d_C));
+    free(h_A);
+    free(h_B);
+    free(h_C);
 }
