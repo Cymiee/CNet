@@ -17,7 +17,7 @@ behind `loss.backward()`.
 ---
 
 ## Demo
-<img width="1388" height="1068" alt="Screen Recording 2026-06-20 at 12 33 50 PM" src="https://github.com/user-attachments/assets/fbd8cd25-43d5-447c-9ecd-c9995ece7087" />
+<img width="1388" height="1068" alt="Screen Recording 2026-06-20 at 12 33 50 PM" src="https://github.com/user-attachments/assets/fbd8cd25-43d5-447c-9ecd-c9995ece7087" />
 
 
 ```
@@ -45,6 +45,13 @@ Test set: 97.7%   (10,000 held-out images)
 - **Python bindings** — a ctypes wrapper with a `Tensor` class and operator
   overloading, so training code reads almost like PyTorch
 - **Inference** — predict from an image file, or draw live in a GUI canvas
+- **CUDA backend** *(in progress)* — a GPU implementation of the core tensor
+  operations, written from scratch in CUDA C. Each kernel is validated against the
+  existing CPU implementation, which acts as the correctness reference — so every
+  GPU result is checked against known-correct output before it's trusted. Working
+  and validated so far on an RTX 3060: elementwise ops (add, ReLU) and a naive
+  matmul kernel. Next up: a tiled matmul using shared memory, then routing the MLP
+  training loop through the GPU and benchmarking the end-to-end speedup.
 
 ## Status
 - [x] Tensor engine — N-D tensors, stride arithmetic
@@ -54,7 +61,9 @@ Test set: 97.7%   (10,000 held-out images)
 - [x] MNIST training — 784→512→10 MLP, Adam, **97.7% test accuracy**
 - [x] Save / load weights
 - [x] Live drawing app + image prediction
-- [ ] Convolutional layers (next)
+- [ ] **CUDA backend** — kernels written & validated (add, ReLU, naive matmul);
+  tiled matmul and training-loop integration in progress
+- [ ] Convolutional layers
 
 ---
 
@@ -69,6 +78,11 @@ gcc -O2 -shared -fPIC -o python/libcnet.so core/tensor.c core/mnist.c -lm
 ```
 
 Recompile the shared library any time you change the C source.
+
+> **Note:** the CUDA backend is under active development on a separate branch and
+> is not yet part of the build above. It currently lives as standalone, individually
+> validated kernels; it will be wired into the framework build once the training
+> loop runs on the GPU.
 
 ---
 

@@ -38,10 +38,10 @@ int main() {
     h_C = (float *)malloc(size_C);
 
     for (int i = 0; i < M * K; ++i) {
-        h_A[i] = (float)(rand()/RAND_MAX);
+        h_A[i] = (float)rand() / (float)RAND_MAX;
     }
     for (int i = 0; i < K * N; ++i) {
-        h_B[i] = (float)(rand()/RAND_MAX);
+        h_B[i] = (float)rand() / (float)RAND_MAX;
     }
 
     float *d_A, *d_B, *d_C;
