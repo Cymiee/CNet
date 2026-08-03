@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cuda_runtime.h>
+#include <time.h>
 
 #define CUDA_CHECK(call)                                                   \
     do {                                                                   \
@@ -57,8 +58,16 @@ int main() {
                    (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
     matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N);
+    cudaDeviceSynchronize();
+
+    clock_t gpu_start = clock();
+    matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N);
+    cudaDeviceSynchronize();
+    clock_t gpu_end = clock();
+    double gpu_time = (double)(gpu_end - gpu_start) / CLOCKS_PER_SEC;
     CUDA_CHECK(cudaMemcpy(h_C, d_C, size_C, cudaMemcpyDeviceToHost));
 
+    clock_t cpu_start = clock();
     float *expected = (float *)malloc(size_C);
     for (int row = 0; row < M; ++row) {
         for (int col = 0; col < N; ++col) {
@@ -69,11 +78,18 @@ int main() {
             expected[row * N + col] = sum;
         }
     }
+    clock_t cpu_end = clock();
+    double cpu_time = (double)(cpu_end - cpu_start) / CLOCKS_PER_SEC;
+
     int correct = 1;
     for (int i = 0; i < M * N; ++i) {
         if (fabsf(h_C[i] - expected[i]) > 1e-3f) { correct = 0; break; }
     }
     printf(correct ? "Matmul PASS\n" : "Matmul FAIL\n");
+    printf("GPU time: %f seconds\n", gpu_time);
+    printf("CPU time: %f seconds\n", cpu_time);
+    printf("Speedup: %f\n", cpu_time / gpu_time);
+
     free(expected);
 
     CUDA_CHECK(cudaFree(d_A));
