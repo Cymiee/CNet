@@ -57,14 +57,19 @@ int main() {
     dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
                    (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-    matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N);
-    cudaDeviceSynchronize();
+    cudaEvent_t start, stop;
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
 
-    clock_t gpu_start = clock();
+    CUDA_CHECK(cudaEventRecord(start));
     matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N);
-    cudaDeviceSynchronize();
-    clock_t gpu_end = clock();
-    double gpu_time = (double)(gpu_end - gpu_start) / CLOCKS_PER_SEC;
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+
+    float gpu_ms = 0.0f;
+    CUDA_CHECK(cudaEventElapsedTime(&gpu_ms, start, stop));
+    double gpu_time = gpu_ms / 1000.0;
+
     CUDA_CHECK(cudaMemcpy(h_C, d_C, size_C, cudaMemcpyDeviceToHost));
 
     clock_t cpu_start = clock();
