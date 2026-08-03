@@ -13,7 +13,7 @@
         }                                                                  \
     } while (0)
 
-
+// kernel for matrix multiplication
 __global__ void matmul(float *A, float *B, float *C, int M, int K, int N) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -23,6 +23,31 @@ __global__ void matmul(float *A, float *B, float *C, int M, int K, int N) {
         for (int k = 0; k < K; ++k) {
             sum += A[row * K + k] * B[k * N + col];
         }
+        C[row * N + col] = sum;
+    }
+}
+
+#define TILE 16
+__global__ void matmul_tiled(float *A, float *B, float *C, int M, int K, int N) {
+    __shared__ float As[TILE][TILE];
+    __shared__ float Bs[TILE][TILE];
+
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    float sum = 0.0f;
+
+    for (int t = 0; t < K/TILE; ++t) {
+        As[threadIdx.y][threadIdx.x] = A[row * K + (t * TILE + threadIdx.x)];
+        Bs[threadIdx.y][threadIdx.x] = B[(t * TILE + threadIdx.y) * N + col];
+        __syncthreads();
+
+        for (int k = 0; k < TILE; ++k) {
+            sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
+        }
+        __syncthreads();
+    }
+
+    if (row < M && col < N) {
         C[row * N + col] = sum;
     }
 }
@@ -56,6 +81,8 @@ int main() {
     dim3 threadsPerBlock(16, 16);
     dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
                    (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    matmul<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, M, K, N); //warmup kernel launch
 
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
